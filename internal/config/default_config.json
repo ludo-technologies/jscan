@@ -1,0 +1,18 @@
+{
+  "complexity": {
+    "lowThreshold": 10,
+    "mediumThreshold": 20,
+    "maxComplexity": 0,
+    "enabled": true,
+    "reportUnchanged": false
+  },
+  "deadCode": {
+    "enabled": true,
+    "minSeverity": "warning"
+  },
+  "output": {
+    "format": "text",
+    "showDetails": true,
+    "colorize": true
+  }
+}

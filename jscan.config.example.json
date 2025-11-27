@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "title": "jscan Configuration",
+  "description": "Configuration for jscan - JavaScript/TypeScript static analyzer",
+  
+  "complexity": {
+    "lowThreshold": 10,
+    "mediumThreshold": 20,
+    "maxComplexity": 0,
+    "enabled": true,
+    "reportUnchanged": false
+  },
+  
+  "deadCode": {
+    "enabled": true,
+    "minSeverity": "warning",
+    "detectAfterReturn": true,
+    "detectAfterBreak": true,
+    "detectAfterContinue": true,
+    "detectAfterThrow": true,
+    "detectUnreachableBranches": true
+  },
+  
+  "output": {
+    "format": "text",
+    "showDetails": true,
+    "colorize": true
+  },
+  
+  "analysis": {
+    "include": [
+      "**/*.js",
+      "**/*.jsx",
+      "**/*.ts",
+      "**/*.tsx",
+      "**/*.mjs",
+      "**/*.cjs"
+    ],
+    "exclude": [
+      "**/node_modules/**",
+      "**/dist/**",
+      "**/build/**",
+      "**/*.min.js",
+      "**/*.bundle.js"
+    ],
+    "maxFileSize": 1000,
+    "workers": 0
+  }
+}
