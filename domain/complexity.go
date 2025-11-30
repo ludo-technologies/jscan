@@ -72,69 +72,69 @@ type ComplexityRequest struct {
 // ComplexityMetrics represents detailed complexity metrics for a function
 type ComplexityMetrics struct {
 	// McCabe cyclomatic complexity
-	Complexity int
+	Complexity int `json:"complexity" yaml:"complexity"`
 
 	// CFG metrics
-	Nodes int
-	Edges int
+	Nodes int `json:"nodes" yaml:"nodes"`
+	Edges int `json:"edges" yaml:"edges"`
 
 	// Nesting depth
-	NestingDepth int
+	NestingDepth int `json:"nesting_depth" yaml:"nesting_depth"`
 
 	// Statement counts
-	IfStatements      int
-	LoopStatements    int
-	ExceptionHandlers int
-	SwitchCases       int
+	IfStatements      int `json:"if_statements" yaml:"if_statements"`
+	LoopStatements    int `json:"loop_statements" yaml:"loop_statements"`
+	ExceptionHandlers int `json:"exception_handlers" yaml:"exception_handlers"`
+	SwitchCases       int `json:"switch_cases" yaml:"switch_cases"`
 }
 
 // FunctionComplexity represents complexity analysis result for a single function
 type FunctionComplexity struct {
 	// Function identification
-	Name        string
-	FilePath    string
-	StartLine   int
-	StartColumn int
-	EndLine     int
+	Name        string `json:"name" yaml:"name"`
+	FilePath    string `json:"file_path" yaml:"file_path"`
+	StartLine   int    `json:"start_line" yaml:"start_line"`
+	StartColumn int    `json:"start_column" yaml:"start_column"`
+	EndLine     int    `json:"end_line" yaml:"end_line"`
 
 	// Complexity metrics
-	Metrics ComplexityMetrics
+	Metrics ComplexityMetrics `json:"metrics" yaml:"metrics"`
 
 	// Risk assessment
-	RiskLevel RiskLevel
+	RiskLevel RiskLevel `json:"risk_level" yaml:"risk_level"`
 }
 
 // ComplexitySummary represents aggregate statistics
 type ComplexitySummary struct {
-	TotalFunctions    int
-	AverageComplexity float64
-	MaxComplexity     int
-	MinComplexity     int
-	FilesAnalyzed     int
+	TotalFunctions    int     `json:"total_functions" yaml:"total_functions"`
+	AverageComplexity float64 `json:"average_complexity" yaml:"average_complexity"`
+	MaxComplexity     int     `json:"max_complexity" yaml:"max_complexity"`
+	MinComplexity     int     `json:"min_complexity" yaml:"min_complexity"`
+	FilesAnalyzed     int     `json:"files_analyzed" yaml:"files_analyzed"`
 
 	// Risk distribution
-	LowRiskFunctions    int
-	MediumRiskFunctions int
-	HighRiskFunctions   int
+	LowRiskFunctions    int `json:"low_risk_functions" yaml:"low_risk_functions"`
+	MediumRiskFunctions int `json:"medium_risk_functions" yaml:"medium_risk_functions"`
+	HighRiskFunctions   int `json:"high_risk_functions" yaml:"high_risk_functions"`
 
 	// Complexity distribution
-	ComplexityDistribution map[string]int
+	ComplexityDistribution map[string]int `json:"complexity_distribution,omitempty" yaml:"complexity_distribution,omitempty"`
 }
 
 // ComplexityResponse represents the complete analysis result
 type ComplexityResponse struct {
 	// Analysis results
-	Functions []FunctionComplexity
-	Summary   ComplexitySummary
+	Functions []FunctionComplexity `json:"functions" yaml:"functions"`
+	Summary   ComplexitySummary    `json:"summary" yaml:"summary"`
 
 	// Warnings and issues
-	Warnings []string
-	Errors   []string
+	Warnings []string `json:"warnings,omitempty" yaml:"warnings,omitempty"`
+	Errors   []string `json:"errors,omitempty" yaml:"errors,omitempty"`
 
 	// Metadata
-	GeneratedAt string
-	Version     string
-	Config      interface{} // Configuration used for analysis
+	GeneratedAt string      `json:"generated_at" yaml:"generated_at"`
+	Version     string      `json:"version" yaml:"version"`
+	Config      interface{} `json:"config,omitempty" yaml:"config,omitempty"` // Configuration used for analysis
 }
 
 // ComplexityService defines the core business logic for complexity analysis

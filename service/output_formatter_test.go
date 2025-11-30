@@ -1,0 +1,253 @@
+package service
+
+import (
+	"bytes"
+	"encoding/json"
+	"strings"
+	"testing"
+	"time"
+
+	"github.com/ludo-technologies/jscan/domain"
+)
+
+func TestWriteJSON(t *testing.T) {
+	data := map[string]interface{}{
+		"name":  "test",
+		"value": 42,
+	}
+
+	var buf bytes.Buffer
+	err := WriteJSON(&buf, data)
+	if err != nil {
+		t.Fatalf("WriteJSON failed: %v", err)
+	}
+
+	// Check that it's valid JSON
+	var result map[string]interface{}
+	err = json.Unmarshal(buf.Bytes(), &result)
+	if err != nil {
+		t.Fatalf("Failed to parse output as JSON: %v", err)
+	}
+
+	if result["name"] != "test" {
+		t.Errorf("Expected name to be 'test', got %v", result["name"])
+	}
+}
+
+func TestOutputFormatterWriteComplexityJSON(t *testing.T) {
+	formatter := NewOutputFormatter()
+
+	response := &domain.ComplexityResponse{
+		Functions: []domain.FunctionComplexity{
+			{
+				Name:      "testFunc",
+				FilePath:  "test.js",
+				StartLine: 1,
+				EndLine:   10,
+				Metrics: domain.ComplexityMetrics{
+					Complexity: 5,
+					Nodes:      10,
+					Edges:      15,
+				},
+				RiskLevel: domain.RiskLevelLow,
+			},
+		},
+		Summary: domain.ComplexitySummary{
+			TotalFunctions:    1,
+			AverageComplexity: 5.0,
+			MaxComplexity:     5,
+			MinComplexity:     5,
+			FilesAnalyzed:     1,
+			LowRiskFunctions:  1,
+		},
+		GeneratedAt: time.Now().Format(time.RFC3339),
+		Version:     "test",
+	}
+
+	var buf bytes.Buffer
+	err := formatter.Write(response, domain.OutputFormatJSON, &buf)
+	if err != nil {
+		t.Fatalf("Write failed: %v", err)
+	}
+
+	// Verify JSON structure
+	var result ComplexityResponseJSON
+	err = json.Unmarshal(buf.Bytes(), &result)
+	if err != nil {
+		t.Fatalf("Failed to parse output as JSON: %v", err)
+	}
+
+	if len(result.Functions) != 1 {
+		t.Errorf("Expected 1 function, got %d", len(result.Functions))
+	}
+	if result.Functions[0].Name != "testFunc" {
+		t.Errorf("Expected function name 'testFunc', got %s", result.Functions[0].Name)
+	}
+}
+
+func TestOutputFormatterWriteComplexityText(t *testing.T) {
+	formatter := NewOutputFormatter()
+
+	response := &domain.ComplexityResponse{
+		Functions: []domain.FunctionComplexity{
+			{
+				Name:      "testFunc",
+				FilePath:  "test.js",
+				StartLine: 1,
+				EndLine:   10,
+				Metrics: domain.ComplexityMetrics{
+					Complexity: 5,
+				},
+				RiskLevel: domain.RiskLevelLow,
+			},
+		},
+		Summary: domain.ComplexitySummary{
+			TotalFunctions:    1,
+			AverageComplexity: 5.0,
+			MaxComplexity:     5,
+			MinComplexity:     5,
+			FilesAnalyzed:     1,
+		},
+		GeneratedAt: time.Now().Format(time.RFC3339),
+		Version:     "test",
+	}
+
+	var buf bytes.Buffer
+	err := formatter.Write(response, domain.OutputFormatText, &buf)
+	if err != nil {
+		t.Fatalf("Write failed: %v", err)
+	}
+
+	output := buf.String()
+
+	// Check for expected content
+	if !strings.Contains(output, "Complexity Analysis") {
+		t.Error("Expected output to contain 'Complexity Analysis'")
+	}
+	if !strings.Contains(output, "testFunc") {
+		t.Error("Expected output to contain function name 'testFunc'")
+	}
+	if !strings.Contains(output, "Total functions: 1") {
+		t.Error("Expected output to contain 'Total functions: 1'")
+	}
+}
+
+func TestOutputFormatterWriteDeadCodeJSON(t *testing.T) {
+	formatter := NewOutputFormatter()
+
+	response := &domain.DeadCodeResponse{
+		Files: []domain.FileDeadCode{
+			{
+				FilePath: "test.js",
+				Functions: []domain.FunctionDeadCode{
+					{
+						Name:     "testFunc",
+						FilePath: "test.js",
+						Findings: []domain.DeadCodeFinding{
+							{
+								Location: domain.DeadCodeLocation{
+									FilePath:  "test.js",
+									StartLine: 5,
+									EndLine:   5,
+								},
+								FunctionName: "testFunc",
+								Reason:       "unreachable_after_return",
+								Severity:     domain.DeadCodeSeverityWarning,
+								Description:  "Code after return statement",
+							},
+						},
+						CriticalCount: 0,
+						WarningCount:  1,
+						InfoCount:     0,
+					},
+				},
+				TotalFindings: 1,
+			},
+		},
+		Summary: domain.DeadCodeSummary{
+			TotalFiles:       1,
+			TotalFunctions:   1,
+			TotalFindings:    1,
+			WarningFindings:  1,
+		},
+		GeneratedAt: time.Now().Format(time.RFC3339),
+		Version:     "test",
+	}
+
+	var buf bytes.Buffer
+	err := formatter.WriteDeadCode(response, domain.OutputFormatJSON, &buf)
+	if err != nil {
+		t.Fatalf("WriteDeadCode failed: %v", err)
+	}
+
+	// Verify JSON structure
+	var result DeadCodeResponseJSON
+	err = json.Unmarshal(buf.Bytes(), &result)
+	if err != nil {
+		t.Fatalf("Failed to parse output as JSON: %v", err)
+	}
+
+	if len(result.Files) != 1 {
+		t.Errorf("Expected 1 file, got %d", len(result.Files))
+	}
+	if result.Summary.TotalFindings != 1 {
+		t.Errorf("Expected 1 finding, got %d", result.Summary.TotalFindings)
+	}
+}
+
+func TestOutputFormatterWriteAnalyzeJSON(t *testing.T) {
+	formatter := NewOutputFormatter()
+
+	complexityResponse := &domain.ComplexityResponse{
+		Functions: []domain.FunctionComplexity{
+			{
+				Name:      "testFunc",
+				FilePath:  "test.js",
+				Metrics:   domain.ComplexityMetrics{Complexity: 5},
+				RiskLevel: domain.RiskLevelLow,
+			},
+		},
+		Summary: domain.ComplexitySummary{
+			TotalFunctions:    1,
+			AverageComplexity: 5.0,
+			FilesAnalyzed:     1,
+		},
+		GeneratedAt: time.Now().Format(time.RFC3339),
+		Version:     "test",
+	}
+
+	var buf bytes.Buffer
+	err := formatter.WriteAnalyze(complexityResponse, nil, domain.OutputFormatJSON, &buf, 100*time.Millisecond)
+	if err != nil {
+		t.Fatalf("WriteAnalyze failed: %v", err)
+	}
+
+	// Verify JSON structure
+	var result AnalyzeResponseJSON
+	err = json.Unmarshal(buf.Bytes(), &result)
+	if err != nil {
+		t.Fatalf("Failed to parse output as JSON: %v", err)
+	}
+
+	if result.Complexity == nil {
+		t.Error("Expected complexity response to be present")
+	}
+	if result.Summary == nil {
+		t.Error("Expected summary to be present")
+	}
+	if result.Summary.ComplexityEnabled != true {
+		t.Error("Expected complexity to be enabled in summary")
+	}
+}
+
+func TestOutputFormatterUnsupportedFormat(t *testing.T) {
+	formatter := NewOutputFormatter()
+
+	response := &domain.ComplexityResponse{}
+	var buf bytes.Buffer
+
+	err := formatter.Write(response, domain.OutputFormatHTML, &buf)
+	if err == nil {
+		t.Error("Expected error for unsupported format")
+	}
+}

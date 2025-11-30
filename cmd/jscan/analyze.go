@@ -1,14 +1,19 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
+	"github.com/ludo-technologies/jscan/domain"
 	"github.com/ludo-technologies/jscan/internal/analyzer"
 	"github.com/ludo-technologies/jscan/internal/config"
 	"github.com/ludo-technologies/jscan/internal/parser"
+	"github.com/ludo-technologies/jscan/internal/version"
+	"github.com/ludo-technologies/jscan/service"
 	"github.com/spf13/cobra"
 )
 
@@ -16,6 +21,7 @@ var (
 	selectAnalyses []string
 	outputFormat   string
 	configPath     string
+	jsonOutput     bool
 )
 
 func analyzeCmd() *cobra.Command {
@@ -27,7 +33,8 @@ func analyzeCmd() *cobra.Command {
 Examples:
   jscan analyze src/
   jscan analyze --select complexity src/
-  jscan analyze --select complexity,deadcode --format json src/`,
+  jscan analyze --select complexity,deadcode --json src/
+  jscan analyze --format json src/`,
 		RunE: runAnalyze,
 	}
 
@@ -35,6 +42,8 @@ Examples:
 		"Analyses to run (comma-separated): complexity,deadcode")
 	cmd.Flags().StringVarP(&outputFormat, "format", "f", "text",
 		"Output format: text, json")
+	cmd.Flags().BoolVar(&jsonOutput, "json", false,
+		"Output results as JSON (shorthand for --format json)")
 	cmd.Flags().StringVarP(&configPath, "config", "c", "",
 		"Path to config file")
 
@@ -46,11 +55,19 @@ func runAnalyze(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("no paths specified")
 	}
 
+	// Determine output format
+	format := domain.OutputFormatText
+	if jsonOutput || outputFormat == "json" {
+		format = domain.OutputFormatJSON
+	}
+
 	// Load configuration
 	cfg := config.DefaultConfig()
 	if configPath != "" {
 		// TODO: Load custom config
-		fmt.Printf("Using config: %s\n", configPath)
+		if format != domain.OutputFormatJSON {
+			fmt.Printf("Using config: %s\n", configPath)
+		}
 	}
 
 	// Collect JavaScript/TypeScript files
@@ -67,116 +84,173 @@ func runAnalyze(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("no JavaScript/TypeScript files found")
 	}
 
-	fmt.Printf("Analyzing %d files...\n", len(files))
+	if format != domain.OutputFormatJSON {
+		fmt.Printf("Analyzing %d files...\n", len(files))
+	}
 
-	// Analyze each file
-	var totalComplexity int
-	var totalFunctions int
-	var totalDeadCodeFindings int
+	// Start timing
+	startTime := time.Now()
 
-	for _, file := range files {
-		if err := analyzeFile(file, cfg); err != nil {
-			fmt.Fprintf(os.Stderr, "Error analyzing %s: %v\n", file, err)
+	// Initialize responses
+	var complexityResponse *domain.ComplexityResponse
+	var deadCodeResponse *domain.DeadCodeResponse
+
+	// Run complexity analysis if selected
+	if contains(selectAnalyses, "complexity") {
+		resp, err := runComplexityAnalysis(files, cfg)
+		if err != nil {
+			if format != domain.OutputFormatJSON {
+				fmt.Fprintf(os.Stderr, "Complexity analysis error: %v\n", err)
+			}
+		} else {
+			complexityResponse = resp
+		}
+	}
+
+	// Run dead code analysis if selected
+	if contains(selectAnalyses, "deadcode") {
+		resp, err := runDeadCodeAnalysis(files, cfg)
+		if err != nil {
+			if format != domain.OutputFormatJSON {
+				fmt.Fprintf(os.Stderr, "Dead code analysis error: %v\n", err)
+			}
+		} else {
+			deadCodeResponse = resp
+		}
+	}
+
+	// Calculate duration
+	duration := time.Since(startTime)
+
+	// Output results
+	formatter := service.NewOutputFormatter()
+
+	if format == domain.OutputFormatJSON {
+		return formatter.WriteAnalyze(complexityResponse, deadCodeResponse, format, os.Stdout, duration)
+	}
+
+	// Text output
+	return formatter.WriteAnalyze(complexityResponse, deadCodeResponse, format, os.Stdout, duration)
+}
+
+// runComplexityAnalysis runs complexity analysis on the given files
+func runComplexityAnalysis(files []string, cfg *config.Config) (*domain.ComplexityResponse, error) {
+	svc := service.NewComplexityService(&cfg.Complexity)
+
+	req := domain.ComplexityRequest{
+		Paths:           files,
+		LowThreshold:    cfg.Complexity.LowThreshold,
+		MediumThreshold: cfg.Complexity.MediumThreshold,
+		SortBy:          domain.SortByComplexity,
+	}
+
+	ctx := context.Background()
+	return svc.Analyze(ctx, req)
+}
+
+// runDeadCodeAnalysis runs dead code analysis on the given files
+func runDeadCodeAnalysis(files []string, cfg *config.Config) (*domain.DeadCodeResponse, error) {
+	var allFiles []domain.FileDeadCode
+	var totalFindings, criticalFindings, warningFindings, infoFindings int
+	var totalFunctions, functionsWithDeadCode int
+
+	for _, filePath := range files {
+		// Read file
+		content, err := os.ReadFile(filePath)
+		if err != nil {
 			continue
 		}
-	}
 
-	// Print summary
-	fmt.Printf("\nAnalysis complete!\n")
-	fmt.Printf("Files analyzed: %d\n", len(files))
-	fmt.Printf("Total functions: %d\n", totalFunctions)
-
-	if contains(selectAnalyses, "complexity") {
-		fmt.Printf("Total complexity: %d\n", totalComplexity)
-	}
-
-	if contains(selectAnalyses, "deadcode") {
-		fmt.Printf("Dead code findings: %d\n", totalDeadCodeFindings)
-	}
-
-	return nil
-}
-
-func analyzeFile(filePath string, cfg *config.Config) error {
-	// Read file
-	content, err := os.ReadFile(filePath)
-	if err != nil {
-		return fmt.Errorf("failed to read file: %w", err)
-	}
-
-	// Parse file
-	ast, err := parser.ParseForLanguage(filePath, content)
-	if err != nil {
-		return fmt.Errorf("failed to parse file: %w", err)
-	}
-
-	// Build CFGs for all functions
-	builder := analyzer.NewCFGBuilder()
-	cfgs, err := builder.BuildAll(ast)
-	if err != nil {
-		return fmt.Errorf("failed to build CFGs: %w", err)
-	}
-
-	fmt.Printf("\n%s:\n", filePath)
-
-	// Run selected analyses
-	if contains(selectAnalyses, "complexity") {
-		analyzeComplexity(cfgs, cfg)
-	}
-
-	if contains(selectAnalyses, "deadcode") {
-		analyzeDeadCode(cfgs, filePath)
-	}
-
-	return nil
-}
-
-func analyzeComplexity(cfgs map[string]*analyzer.CFG, cfg *config.Config) {
-	fmt.Println("  Complexity Analysis:")
-
-	for name, cfgItem := range cfgs {
-		if name == "__main__" {
-			continue // Skip main module
+		// Parse file
+		ast, err := parser.ParseForLanguage(filePath, content)
+		if err != nil {
+			continue
 		}
 
-		result := analyzer.CalculateComplexityWithConfig(cfgItem, &cfg.Complexity)
-
-		fmt.Printf("    %s: complexity=%d, risk=%s\n",
-			name, result.Complexity, result.RiskLevel)
-
-		if result.Complexity > cfg.Complexity.MediumThreshold {
-			fmt.Printf("      ⚠ High complexity detected!\n")
-		}
-	}
-}
-
-func analyzeDeadCode(cfgs map[string]*analyzer.CFG, filePath string) {
-	fmt.Println("  Dead Code Analysis:")
-
-	results := analyzer.DetectAll(cfgs, filePath)
-
-	totalFindings := 0
-	for name, result := range results {
-		if name == "__main__" {
-			continue // Skip main module
+		// Build CFGs for all functions
+		builder := analyzer.NewCFGBuilder()
+		cfgs, err := builder.BuildAll(ast)
+		if err != nil {
+			continue
 		}
 
-		if result.HasFindings() {
-			fmt.Printf("    %s: %d dead code blocks found\n",
-				name, len(result.Findings))
+		// Detect dead code
+		results := analyzer.DetectAll(cfgs, filePath)
 
-			for _, finding := range result.Findings {
-				fmt.Printf("      Line %d: %s (%s)\n",
-					finding.StartLine, finding.Description, finding.Reason)
+		// Convert to domain model
+		var functions []domain.FunctionDeadCode
+		for funcName, result := range results {
+			if funcName == "__main__" {
+				continue
 			}
 
-			totalFindings += len(result.Findings)
+			totalFunctions++
+
+			var findings []domain.DeadCodeFinding
+			for _, finding := range result.Findings {
+				f := domain.DeadCodeFinding{
+					Location: domain.DeadCodeLocation{
+						FilePath:  filePath,
+						StartLine: finding.StartLine,
+						EndLine:   finding.EndLine,
+					},
+					FunctionName: funcName,
+					Reason:       string(finding.Reason),
+					Severity:     domain.DeadCodeSeverity(finding.Severity),
+					Description:  finding.Description,
+				}
+				findings = append(findings, f)
+
+				// Count by severity
+				switch f.Severity {
+				case domain.DeadCodeSeverityCritical:
+					criticalFindings++
+				case domain.DeadCodeSeverityWarning:
+					warningFindings++
+				case domain.DeadCodeSeverityInfo:
+					infoFindings++
+				}
+				totalFindings++
+			}
+
+			if len(findings) > 0 {
+				functionsWithDeadCode++
+				fn := domain.FunctionDeadCode{
+					Name:     funcName,
+					FilePath: filePath,
+					Findings: findings,
+				}
+				fn.CalculateSeverityCounts()
+				functions = append(functions, fn)
+			}
+		}
+
+		if len(functions) > 0 {
+			fileDeadCode := domain.FileDeadCode{
+				FilePath:      filePath,
+				Functions:     functions,
+				TotalFindings: len(functions),
+			}
+			allFiles = append(allFiles, fileDeadCode)
 		}
 	}
 
-	if totalFindings == 0 {
-		fmt.Println("    ✓ No dead code found")
+	response := &domain.DeadCodeResponse{
+		Files: allFiles,
+		Summary: domain.DeadCodeSummary{
+			TotalFiles:            len(files),
+			TotalFunctions:        totalFunctions,
+			TotalFindings:         totalFindings,
+			FunctionsWithDeadCode: functionsWithDeadCode,
+			CriticalFindings:      criticalFindings,
+			WarningFindings:       warningFindings,
+			InfoFindings:          infoFindings,
+		},
+		GeneratedAt: time.Now().Format(time.RFC3339),
+		Version:     version.Version,
 	}
+
+	return response, nil
 }
 
 func collectJSFiles(path string) ([]string, error) {
@@ -212,7 +286,7 @@ func collectJSFiles(path string) ([]string, error) {
 func isJSFile(path string) bool {
 	ext := strings.ToLower(filepath.Ext(path))
 	return ext == ".js" || ext == ".ts" || ext == ".jsx" || ext == ".tsx" ||
-		   ext == ".mjs" || ext == ".cjs" || ext == ".mts" || ext == ".cts"
+		ext == ".mjs" || ext == ".cjs" || ext == ".mts" || ext == ".cts"
 }
 
 func contains(slice []string, item string) bool {
