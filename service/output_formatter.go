@@ -1,13 +1,16 @@
 package service
 
 import (
+	"encoding/csv"
 	"encoding/json"
 	"fmt"
 	"io"
+	"strconv"
 	"time"
 
 	"github.com/ludo-technologies/jscan/domain"
 	"github.com/ludo-technologies/jscan/internal/version"
+	"gopkg.in/yaml.v3"
 )
 
 // OutputFormatterImpl implements the OutputFormatter interface
@@ -106,6 +109,10 @@ func (f *OutputFormatterImpl) WriteAnalyze(
 		return f.writeAnalyzeText(complexityResponse, deadCodeResponse, writer, duration)
 	case domain.OutputFormatHTML:
 		return f.WriteHTML(complexityResponse, deadCodeResponse, writer, duration)
+	case domain.OutputFormatYAML:
+		return f.writeAnalyzeYAML(complexityResponse, deadCodeResponse, writer, duration)
+	case domain.OutputFormatCSV:
+		return f.writeAnalyzeCSV(complexityResponse, deadCodeResponse, writer, duration)
 	default:
 		return fmt.Errorf("unsupported output format: %s", format)
 	}
@@ -339,6 +346,160 @@ func (f *OutputFormatterImpl) writeAnalyzeText(
 	if deadCodeResponse != nil {
 		if err := f.writeDeadCodeText(deadCodeResponse, writer); err != nil {
 			return err
+		}
+	}
+
+	return nil
+}
+
+// writeAnalyzeYAML writes unified analysis response as YAML
+func (f *OutputFormatterImpl) writeAnalyzeYAML(
+	complexityResponse *domain.ComplexityResponse,
+	deadCodeResponse *domain.DeadCodeResponse,
+	writer io.Writer,
+	duration time.Duration,
+) error {
+	now := time.Now()
+
+	response := AnalyzeResponseJSON{
+		Version:     version.Version,
+		GeneratedAt: now.Format(time.RFC3339),
+		DurationMs:  duration.Milliseconds(),
+	}
+
+	// Build summary
+	summary := &domain.AnalyzeSummary{}
+
+	// Add complexity data if available
+	if complexityResponse != nil {
+		response.Complexity = &ComplexityResponseJSON{
+			Version:     version.Version,
+			GeneratedAt: complexityResponse.GeneratedAt,
+			Functions:   complexityResponse.Functions,
+			Summary:     complexityResponse.Summary,
+			Warnings:    complexityResponse.Warnings,
+			Errors:      complexityResponse.Errors,
+			Config:      complexityResponse.Config,
+		}
+		summary.ComplexityEnabled = true
+		summary.TotalFunctions = complexityResponse.Summary.TotalFunctions
+		summary.AverageComplexity = complexityResponse.Summary.AverageComplexity
+		summary.HighComplexityCount = complexityResponse.Summary.HighRiskFunctions
+		summary.AnalyzedFiles = complexityResponse.Summary.FilesAnalyzed
+	}
+
+	// Add dead code data if available
+	if deadCodeResponse != nil {
+		response.DeadCode = &DeadCodeResponseJSON{
+			Version:     version.Version,
+			GeneratedAt: deadCodeResponse.GeneratedAt,
+			Files:       deadCodeResponse.Files,
+			Summary:     deadCodeResponse.Summary,
+			Warnings:    deadCodeResponse.Warnings,
+			Errors:      deadCodeResponse.Errors,
+			Config:      deadCodeResponse.Config,
+		}
+		summary.DeadCodeEnabled = true
+		summary.DeadCodeCount = deadCodeResponse.Summary.TotalFindings
+		summary.CriticalDeadCode = deadCodeResponse.Summary.CriticalFindings
+		summary.WarningDeadCode = deadCodeResponse.Summary.WarningFindings
+		summary.InfoDeadCode = deadCodeResponse.Summary.InfoFindings
+		if deadCodeResponse.Summary.TotalFiles > summary.TotalFiles {
+			summary.TotalFiles = deadCodeResponse.Summary.TotalFiles
+		}
+	}
+
+	// Calculate health score
+	_ = summary.CalculateHealthScore()
+	response.Summary = summary
+
+	// Write YAML
+	encoder := yaml.NewEncoder(writer)
+	encoder.SetIndent(2)
+	return encoder.Encode(response)
+}
+
+// writeAnalyzeCSV writes unified analysis response as CSV
+func (f *OutputFormatterImpl) writeAnalyzeCSV(
+	complexityResponse *domain.ComplexityResponse,
+	deadCodeResponse *domain.DeadCodeResponse,
+	writer io.Writer,
+	duration time.Duration,
+) error {
+	csvWriter := csv.NewWriter(writer)
+	defer csvWriter.Flush()
+
+	// Write complexity results
+	if complexityResponse != nil {
+		// Write header
+		if err := csvWriter.Write([]string{
+			"type", "file", "function", "start_line", "end_line",
+			"complexity", "risk_level", "nodes", "edges",
+		}); err != nil {
+			return err
+		}
+
+		// Write function data
+		for _, fn := range complexityResponse.Functions {
+			record := []string{
+				"complexity",
+				fn.FilePath,
+				fn.Name,
+				strconv.Itoa(fn.StartLine),
+				strconv.Itoa(fn.EndLine),
+				strconv.Itoa(fn.Metrics.Complexity),
+				string(fn.RiskLevel),
+				strconv.Itoa(fn.Metrics.Nodes),
+				strconv.Itoa(fn.Metrics.Edges),
+			}
+			if err := csvWriter.Write(record); err != nil {
+				return err
+			}
+		}
+	}
+
+	// Write dead code results
+	if deadCodeResponse != nil {
+		// Write header if no complexity data
+		if complexityResponse == nil {
+			if err := csvWriter.Write([]string{
+				"type", "file", "function", "start_line", "end_line",
+				"severity", "reason", "description",
+			}); err != nil {
+				return err
+			}
+		} else {
+			// Write empty line to separate sections
+			if err := csvWriter.Write([]string{}); err != nil {
+				return err
+			}
+			if err := csvWriter.Write([]string{
+				"type", "file", "function", "start_line", "end_line",
+				"severity", "reason", "description",
+			}); err != nil {
+				return err
+			}
+		}
+
+		// Write dead code findings
+		for _, file := range deadCodeResponse.Files {
+			for _, fn := range file.Functions {
+				for _, finding := range fn.Findings {
+					record := []string{
+						"dead_code",
+						finding.Location.FilePath,
+						finding.FunctionName,
+						strconv.Itoa(finding.Location.StartLine),
+						strconv.Itoa(finding.Location.EndLine),
+						string(finding.Severity),
+						finding.Reason,
+						finding.Description,
+					}
+					if err := csvWriter.Write(record); err != nil {
+						return err
+					}
+				}
+			}
 		}
 	}
 
