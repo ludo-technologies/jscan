@@ -104,6 +104,8 @@ func (f *OutputFormatterImpl) WriteAnalyze(
 		return f.writeAnalyzeJSON(complexityResponse, deadCodeResponse, writer, duration)
 	case domain.OutputFormatText:
 		return f.writeAnalyzeText(complexityResponse, deadCodeResponse, writer, duration)
+	case domain.OutputFormatHTML:
+		return f.WriteHTML(complexityResponse, deadCodeResponse, writer, duration)
 	default:
 		return fmt.Errorf("unsupported output format: %s", format)
 	}

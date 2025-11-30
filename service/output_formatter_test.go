@@ -240,13 +240,69 @@ func TestOutputFormatterWriteAnalyzeJSON(t *testing.T) {
 	}
 }
 
+func TestOutputFormatterWriteHTML(t *testing.T) {
+	formatter := NewOutputFormatter()
+
+	complexityResponse := &domain.ComplexityResponse{
+		Functions: []domain.FunctionComplexity{
+			{
+				Name:      "testFunc",
+				FilePath:  "test.js",
+				Metrics:   domain.ComplexityMetrics{Complexity: 5},
+				RiskLevel: domain.RiskLevelLow,
+			},
+		},
+		Summary: domain.ComplexitySummary{
+			TotalFunctions:    1,
+			AverageComplexity: 5.0,
+			MaxComplexity:     5,
+			FilesAnalyzed:     1,
+		},
+		GeneratedAt: time.Now().Format(time.RFC3339),
+		Version:     "test",
+	}
+
+	deadCodeResponse := &domain.DeadCodeResponse{
+		Summary: domain.DeadCodeSummary{
+			TotalFiles:      1,
+			TotalFunctions:  1,
+			TotalFindings:   1,
+			WarningFindings: 1,
+		},
+		GeneratedAt: time.Now().Format(time.RFC3339),
+		Version:     "test",
+	}
+
+	var buf bytes.Buffer
+	err := formatter.WriteAnalyze(complexityResponse, deadCodeResponse, domain.OutputFormatHTML, &buf, 100*time.Millisecond)
+	if err != nil {
+		t.Fatalf("WriteAnalyze with HTML failed: %v", err)
+	}
+
+	output := buf.String()
+
+	// Check for expected HTML content
+	if !strings.Contains(output, "<!DOCTYPE html>") {
+		t.Error("Expected output to contain HTML doctype")
+	}
+	if !strings.Contains(output, "jscan Analysis Report") {
+		t.Error("Expected output to contain 'jscan Analysis Report'")
+	}
+	if !strings.Contains(output, "Health Score") {
+		t.Error("Expected output to contain 'Health Score'")
+	}
+	if !strings.Contains(output, "testFunc") {
+		t.Error("Expected output to contain function name 'testFunc'")
+	}
+}
+
 func TestOutputFormatterUnsupportedFormat(t *testing.T) {
 	formatter := NewOutputFormatter()
 
 	response := &domain.ComplexityResponse{}
 	var buf bytes.Buffer
 
-	err := formatter.Write(response, domain.OutputFormatHTML, &buf)
+	err := formatter.Write(response, domain.OutputFormatYAML, &buf)
 	if err == nil {
 		t.Error("Expected error for unsupported format")
 	}

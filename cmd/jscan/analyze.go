@@ -22,6 +22,9 @@ var (
 	outputFormat   string
 	configPath     string
 	jsonOutput     bool
+	htmlOutput     bool
+	noOpenBrowser  bool
+	outputPath     string
 )
 
 func analyzeCmd() *cobra.Command {
@@ -41,9 +44,15 @@ Examples:
 	cmd.Flags().StringSliceVarP(&selectAnalyses, "select", "s", []string{"complexity", "deadcode"},
 		"Analyses to run (comma-separated): complexity,deadcode")
 	cmd.Flags().StringVarP(&outputFormat, "format", "f", "text",
-		"Output format: text, json")
+		"Output format: text, json, html")
 	cmd.Flags().BoolVar(&jsonOutput, "json", false,
 		"Output results as JSON (shorthand for --format json)")
+	cmd.Flags().BoolVar(&htmlOutput, "html", false,
+		"Output results as HTML (shorthand for --format html)")
+	cmd.Flags().BoolVar(&noOpenBrowser, "no-open", false,
+		"Don't auto-open HTML report in browser")
+	cmd.Flags().StringVarP(&outputPath, "output", "o", "",
+		"Output file path (default: jscan-report.html for HTML)")
 	cmd.Flags().StringVarP(&configPath, "config", "c", "",
 		"Path to config file")
 
@@ -59,6 +68,8 @@ func runAnalyze(cmd *cobra.Command, args []string) error {
 	format := domain.OutputFormatText
 	if jsonOutput || outputFormat == "json" {
 		format = domain.OutputFormatJSON
+	} else if htmlOutput || outputFormat == "html" {
+		format = domain.OutputFormatHTML
 	}
 
 	// Load configuration
@@ -125,11 +136,41 @@ func runAnalyze(cmd *cobra.Command, args []string) error {
 	// Output results
 	formatter := service.NewOutputFormatter()
 
-	if format == domain.OutputFormatJSON {
-		return formatter.WriteAnalyze(complexityResponse, deadCodeResponse, format, os.Stdout, duration)
+	// Handle HTML output with file writing and browser opening
+	if format == domain.OutputFormatHTML {
+		// Determine output path
+		htmlPath := outputPath
+		if htmlPath == "" {
+			htmlPath = "jscan-report.html"
+		}
+
+		// Create HTML file
+		file, err := os.Create(htmlPath)
+		if err != nil {
+			return fmt.Errorf("failed to create HTML file: %w", err)
+		}
+		defer file.Close()
+
+		// Write HTML
+		if err := formatter.WriteAnalyze(complexityResponse, deadCodeResponse, format, file, duration); err != nil {
+			return err
+		}
+
+		// Get absolute path for display
+		absPath, _ := filepath.Abs(htmlPath)
+		fmt.Printf("HTML report saved to: %s\n", absPath)
+
+		// Open in browser unless disabled
+		if !noOpenBrowser && !service.IsSSH() {
+			if err := service.OpenBrowser("file://" + absPath); err != nil {
+				fmt.Fprintf(os.Stderr, "Warning: Could not open browser: %v\n", err)
+			}
+		}
+
+		return nil
 	}
 
-	// Text output
+	// JSON or Text output to stdout
 	return formatter.WriteAnalyze(complexityResponse, deadCodeResponse, format, os.Stdout, duration)
 }
 
