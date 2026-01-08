@@ -12,8 +12,17 @@ import (
 type GroupingMode string
 
 const (
-	GroupingModeConnected GroupingMode = "connected"
-	GroupingModeKCore     GroupingMode = "k_core"
+	GroupingModeConnected       GroupingMode = "connected"
+	GroupingModeKCore           GroupingMode = "k_core"
+	GroupingModeStarMedoid      GroupingMode = "star_medoid"
+	GroupingModeCompleteLinkage GroupingMode = "complete_linkage"
+	GroupingModeCentroid        GroupingMode = "centroid"
+)
+
+// Algorithm-specific constants
+const (
+	starMedoidMaxIterations    = 10
+	starMedoidConvergenceRatio = 0.01
 )
 
 // GroupingConfig holds configuration for clone grouping
@@ -40,6 +49,12 @@ func CreateGroupingStrategy(config GroupingConfig) GroupingStrategy {
 	switch config.Mode {
 	case GroupingModeKCore:
 		return NewKCoreGrouping(config.Threshold, config.KCoreK)
+	case GroupingModeStarMedoid:
+		return NewStarMedoidGrouping(config.Threshold)
+	case GroupingModeCompleteLinkage:
+		return NewCompleteLinkageGrouping(config.Threshold)
+	case GroupingModeCentroid:
+		return NewCentroidGrouping(config.Threshold)
 	case GroupingModeConnected:
 		fallthrough
 	default:
@@ -357,6 +372,658 @@ func (kg *KCoreGrouping) GroupClones(pairs []*domain.ClonePair) []*domain.CloneG
 	})
 
 	return groups
+}
+
+// StarMedoidGrouping uses iterative medoid optimization for balanced precision/recall
+type StarMedoidGrouping struct {
+	threshold float64
+}
+
+func NewStarMedoidGrouping(threshold float64) *StarMedoidGrouping {
+	return &StarMedoidGrouping{threshold: threshold}
+}
+
+func (s *StarMedoidGrouping) GetName() string { return "Star/Medoid" }
+
+func (s *StarMedoidGrouping) GroupClones(pairs []*domain.ClonePair) []*domain.CloneGroup {
+	if len(pairs) == 0 {
+		return []*domain.CloneGroup{}
+	}
+
+	// Build set of clones and similarity map
+	clones := make([]*domain.Clone, 0)
+	seen := make(map[int]struct{})
+	simMap := make(map[string]float64)
+	typeMap := make(map[string]domain.CloneType)
+
+	addClone := func(clone *domain.Clone) {
+		if clone == nil {
+			return
+		}
+		if _, ok := seen[clone.ID]; !ok {
+			seen[clone.ID] = struct{}{}
+			clones = append(clones, clone)
+		}
+	}
+
+	for _, p := range pairs {
+		if p == nil || p.Clone1 == nil || p.Clone2 == nil {
+			continue
+		}
+		addClone(p.Clone1)
+		addClone(p.Clone2)
+		key := clonePairKey(p.Clone1, p.Clone2)
+		if old, ok := simMap[key]; !ok || p.Similarity > old {
+			simMap[key] = p.Similarity
+			typeMap[key] = p.Type
+		}
+	}
+
+	if len(clones) == 0 {
+		return []*domain.CloneGroup{}
+	}
+
+	// Build clone ID to clone map
+	cloneByID := make(map[int]*domain.Clone)
+	for _, clone := range clones {
+		cloneByID[clone.ID] = clone
+	}
+
+	// Phase 1: Initial clustering using Union-Find (same as ConnectedGrouping)
+	parent := make(map[int]int, len(clones))
+	rank := make(map[int]int, len(clones))
+
+	var find func(int) int
+	find = func(x int) int {
+		if parent[x] != x {
+			parent[x] = find(parent[x])
+		}
+		return parent[x]
+	}
+	union := func(a, b int) {
+		ra := find(a)
+		rb := find(b)
+		if ra == rb {
+			return
+		}
+		if rank[ra] < rank[rb] {
+			parent[ra] = rb
+		} else if rank[ra] > rank[rb] {
+			parent[rb] = ra
+		} else {
+			parent[rb] = ra
+			rank[ra]++
+		}
+	}
+	for _, clone := range clones {
+		parent[clone.ID] = clone.ID
+		rank[clone.ID] = 0
+	}
+
+	// Union only for edges meeting threshold
+	for _, p := range pairs {
+		if p == nil || p.Clone1 == nil || p.Clone2 == nil {
+			continue
+		}
+		if p.Similarity >= s.threshold {
+			union(p.Clone1.ID, p.Clone2.ID)
+		}
+	}
+
+	// Build initial components
+	comp := make(map[int][]*domain.Clone)
+	for _, clone := range clones {
+		r := find(clone.ID)
+		comp[r] = append(comp[r], clone)
+	}
+
+	// Convert to groups (including singletons for now, we'll filter later)
+	type groupData struct {
+		members []*domain.Clone
+		medoid  *domain.Clone
+	}
+	groups := make([]*groupData, 0)
+	for _, members := range comp {
+		if len(members) < 2 {
+			continue
+		}
+		g := &groupData{members: members}
+		groups = append(groups, g)
+	}
+
+	if len(groups) == 0 {
+		return []*domain.CloneGroup{}
+	}
+
+	// Phase 2: Iterative medoid refinement
+	for iter := 0; iter < starMedoidMaxIterations; iter++ {
+		// Find medoid for each group
+		for _, g := range groups {
+			g.medoid = s.findMedoid(g.members, simMap)
+		}
+
+		// Reassign clones to closest medoid
+		newAssignment := make(map[int]int) // clone ID -> group index
+		changed := 0
+
+		for _, clone := range clones {
+			bestGroup := -1
+			bestSim := -1.0
+
+			for gi, g := range groups {
+				if g.medoid == nil {
+					continue
+				}
+				sim := cloneSimilarity(simMap, clone, g.medoid)
+				if sim >= s.threshold && sim > bestSim {
+					bestSim = sim
+					bestGroup = gi
+				}
+			}
+
+			// Find current group
+			currentGroup := -1
+			for gi, g := range groups {
+				for _, m := range g.members {
+					if m.ID == clone.ID {
+						currentGroup = gi
+						break
+					}
+				}
+				if currentGroup >= 0 {
+					break
+				}
+			}
+
+			if bestGroup >= 0 {
+				newAssignment[clone.ID] = bestGroup
+				if bestGroup != currentGroup {
+					changed++
+				}
+			}
+		}
+
+		// Rebuild groups from new assignments
+		newGroups := make([]*groupData, len(groups))
+		for i := range newGroups {
+			newGroups[i] = &groupData{members: make([]*domain.Clone, 0)}
+		}
+		for cloneID, gi := range newAssignment {
+			newGroups[gi].members = append(newGroups[gi].members, cloneByID[cloneID])
+		}
+
+		// Filter empty groups
+		filteredGroups := make([]*groupData, 0)
+		for _, g := range newGroups {
+			if len(g.members) >= 2 {
+				filteredGroups = append(filteredGroups, g)
+			}
+		}
+		groups = filteredGroups
+
+		if len(groups) == 0 {
+			return []*domain.CloneGroup{}
+		}
+
+		// Check convergence
+		if float64(changed)/float64(len(clones)) < starMedoidConvergenceRatio {
+			break
+		}
+	}
+
+	// Phase 3: Finalize groups
+	result := make([]*domain.CloneGroup, 0, len(groups))
+	groupID := 0
+	for _, g := range groups {
+		if len(g.members) < 2 {
+			continue
+		}
+		sort.Slice(g.members, func(i, j int) bool { return cloneLess(g.members[i], g.members[j]) })
+		cg := &domain.CloneGroup{
+			ID:     groupID,
+			Clones: make([]*domain.Clone, 0, len(g.members)),
+			Size:   len(g.members),
+		}
+		groupID++
+		for _, clone := range g.members {
+			cg.AddClone(clone)
+		}
+		cg.Similarity = averageGroupSimilarityClones(simMap, g.members)
+		cg.Type = majorityCloneTypeClones(typeMap, g.members)
+		result = append(result, cg)
+	}
+
+	// Sort groups by similarity then size
+	sort.Slice(result, func(i, j int) bool {
+		if !almostEqual(result[i].Similarity, result[j].Similarity) {
+			return result[i].Similarity > result[j].Similarity
+		}
+		if result[i].Size != result[j].Size {
+			return result[i].Size > result[j].Size
+		}
+		if len(result[i].Clones) == 0 || len(result[j].Clones) == 0 {
+			return false
+		}
+		return cloneLess(result[i].Clones[0], result[j].Clones[0])
+	})
+
+	return result
+}
+
+// findMedoid returns the clone with highest average similarity to all other members
+func (s *StarMedoidGrouping) findMedoid(members []*domain.Clone, simMap map[string]float64) *domain.Clone {
+	if len(members) == 0 {
+		return nil
+	}
+	if len(members) == 1 {
+		return members[0]
+	}
+
+	var bestMedoid *domain.Clone
+	bestAvgSim := -1.0
+
+	for _, candidate := range members {
+		sumSim := 0.0
+		for _, other := range members {
+			if candidate.ID != other.ID {
+				sumSim += cloneSimilarity(simMap, candidate, other)
+			}
+		}
+		avgSim := sumSim / float64(len(members)-1)
+		if avgSim > bestAvgSim {
+			bestAvgSim = avgSim
+			bestMedoid = candidate
+		}
+	}
+
+	return bestMedoid
+}
+
+// CompleteLinkageGrouping ensures all pairs within a group have similarity above threshold
+type CompleteLinkageGrouping struct {
+	threshold float64
+}
+
+func NewCompleteLinkageGrouping(threshold float64) *CompleteLinkageGrouping {
+	return &CompleteLinkageGrouping{threshold: threshold}
+}
+
+func (c *CompleteLinkageGrouping) GetName() string { return "Complete Linkage" }
+
+func (c *CompleteLinkageGrouping) GroupClones(pairs []*domain.ClonePair) []*domain.CloneGroup {
+	if len(pairs) == 0 {
+		return []*domain.CloneGroup{}
+	}
+
+	// Build adjacency set and clone map
+	clones := make([]*domain.Clone, 0)
+	seen := make(map[int]struct{})
+	adj := make(map[int]map[int]bool)
+	simMap := make(map[string]float64)
+	typeMap := make(map[string]domain.CloneType)
+
+	addClone := func(clone *domain.Clone) {
+		if clone == nil {
+			return
+		}
+		if _, ok := seen[clone.ID]; !ok {
+			seen[clone.ID] = struct{}{}
+			clones = append(clones, clone)
+			adj[clone.ID] = make(map[int]bool)
+		}
+	}
+
+	for _, p := range pairs {
+		if p == nil || p.Clone1 == nil || p.Clone2 == nil {
+			continue
+		}
+		addClone(p.Clone1)
+		addClone(p.Clone2)
+		key := clonePairKey(p.Clone1, p.Clone2)
+		if old, ok := simMap[key]; !ok || p.Similarity > old {
+			simMap[key] = p.Similarity
+			typeMap[key] = p.Type
+		}
+		if p.Similarity >= c.threshold {
+			adj[p.Clone1.ID][p.Clone2.ID] = true
+			adj[p.Clone2.ID][p.Clone1.ID] = true
+		}
+	}
+
+	if len(clones) == 0 {
+		return []*domain.CloneGroup{}
+	}
+
+	// Build clone ID to clone map and sorted ID list
+	cloneByID := make(map[int]*domain.Clone)
+	cloneIDs := make([]int, 0, len(clones))
+	for _, clone := range clones {
+		cloneByID[clone.ID] = clone
+		cloneIDs = append(cloneIDs, clone.ID)
+	}
+	sort.Ints(cloneIDs)
+
+	// Find all maximal cliques using Bron-Kerbosch with pivot
+	cliques := make([][]int, 0)
+	c.bronKerbosch(
+		[]int{},                 // R: current clique
+		cloneIDs,                // P: potential candidates
+		[]int{},                 // X: excluded
+		adj,
+		&cliques,
+	)
+
+	// Filter cliques by minimum size and deduplicate
+	filteredCliques := make([][]int, 0)
+	for _, clique := range cliques {
+		if len(clique) >= 2 {
+			filteredCliques = append(filteredCliques, clique)
+		}
+	}
+
+	// Sort cliques by size (descending) for deterministic output
+	sort.Slice(filteredCliques, func(i, j int) bool {
+		return len(filteredCliques[i]) > len(filteredCliques[j])
+	})
+
+	// Convert to CloneGroups
+	groups := make([]*domain.CloneGroup, 0, len(filteredCliques))
+	groupID := 0
+	for _, clique := range filteredCliques {
+		members := make([]*domain.Clone, 0, len(clique))
+		for _, id := range clique {
+			members = append(members, cloneByID[id])
+		}
+		sort.Slice(members, func(i, j int) bool { return cloneLess(members[i], members[j]) })
+
+		g := &domain.CloneGroup{
+			ID:     groupID,
+			Clones: make([]*domain.Clone, 0, len(members)),
+			Size:   len(members),
+		}
+		groupID++
+		for _, clone := range members {
+			g.AddClone(clone)
+		}
+		g.Similarity = averageGroupSimilarityClones(simMap, members)
+		g.Type = majorityCloneTypeClones(typeMap, members)
+		groups = append(groups, g)
+	}
+
+	// Sort groups by similarity then size
+	sort.Slice(groups, func(i, j int) bool {
+		if !almostEqual(groups[i].Similarity, groups[j].Similarity) {
+			return groups[i].Similarity > groups[j].Similarity
+		}
+		if groups[i].Size != groups[j].Size {
+			return groups[i].Size > groups[j].Size
+		}
+		if len(groups[i].Clones) == 0 || len(groups[j].Clones) == 0 {
+			return false
+		}
+		return cloneLess(groups[i].Clones[0], groups[j].Clones[0])
+	})
+
+	return groups
+}
+
+// bronKerbosch implements Bron-Kerbosch algorithm with pivot for finding maximal cliques
+func (c *CompleteLinkageGrouping) bronKerbosch(R, P, X []int, adj map[int]map[int]bool, result *[][]int) {
+	if len(P) == 0 && len(X) == 0 {
+		if len(R) >= 2 {
+			clique := make([]int, len(R))
+			copy(clique, R)
+			*result = append(*result, clique)
+		}
+		return
+	}
+
+	// Choose pivot from P ∪ X that maximizes |P ∩ N(u)|
+	pivot := c.choosePivot(P, X, adj)
+	pivotNeighbors := adj[pivot]
+
+	// Iterate over P \ N(pivot)
+	pCopy := make([]int, len(P))
+	copy(pCopy, P)
+
+	for _, v := range pCopy {
+		if pivotNeighbors[v] {
+			continue // Skip neighbors of pivot
+		}
+
+		// New R = R ∪ {v}
+		newR := append([]int{}, R...)
+		newR = append(newR, v)
+
+		// New P = P ∩ N(v)
+		newP := c.intersect(P, adj[v])
+
+		// New X = X ∩ N(v)
+		newX := c.intersect(X, adj[v])
+
+		c.bronKerbosch(newR, newP, newX, adj, result)
+
+		// P = P \ {v}
+		P = c.remove(P, v)
+		// X = X ∪ {v}
+		X = append(X, v)
+	}
+}
+
+// choosePivot selects a pivot vertex that maximizes connections to P
+func (c *CompleteLinkageGrouping) choosePivot(P, X []int, adj map[int]map[int]bool) int {
+	maxConnections := -1
+	pivot := -1
+
+	candidates := append([]int{}, P...)
+	candidates = append(candidates, X...)
+
+	for _, u := range candidates {
+		connections := 0
+		for _, p := range P {
+			if adj[u][p] {
+				connections++
+			}
+		}
+		if connections > maxConnections {
+			maxConnections = connections
+			pivot = u
+		}
+	}
+
+	if pivot == -1 && len(P) > 0 {
+		pivot = P[0]
+	}
+
+	return pivot
+}
+
+// intersect returns the intersection of slice and set (represented as map keys)
+func (c *CompleteLinkageGrouping) intersect(slice []int, set map[int]bool) []int {
+	result := make([]int, 0)
+	for _, v := range slice {
+		if set[v] {
+			result = append(result, v)
+		}
+	}
+	return result
+}
+
+// remove removes an element from a slice
+func (c *CompleteLinkageGrouping) remove(slice []int, elem int) []int {
+	result := make([]int, 0, len(slice))
+	for _, v := range slice {
+		if v != elem {
+			result = append(result, v)
+		}
+	}
+	return result
+}
+
+// CentroidGrouping uses BFS expansion with strict similarity to all existing members
+type CentroidGrouping struct {
+	threshold float64
+}
+
+func NewCentroidGrouping(threshold float64) *CentroidGrouping {
+	return &CentroidGrouping{threshold: threshold}
+}
+
+func (cg *CentroidGrouping) GetName() string { return "Centroid" }
+
+func (cg *CentroidGrouping) GroupClones(pairs []*domain.ClonePair) []*domain.CloneGroup {
+	if len(pairs) == 0 {
+		return []*domain.CloneGroup{}
+	}
+
+	// Build similarity map and adjacency
+	clones := make([]*domain.Clone, 0)
+	seen := make(map[int]struct{})
+	simMap := make(map[string]float64)
+	typeMap := make(map[string]domain.CloneType)
+	neighbors := make(map[int][]int) // clone ID -> neighbor IDs above threshold
+
+	addClone := func(clone *domain.Clone) {
+		if clone == nil {
+			return
+		}
+		if _, ok := seen[clone.ID]; !ok {
+			seen[clone.ID] = struct{}{}
+			clones = append(clones, clone)
+			neighbors[clone.ID] = make([]int, 0)
+		}
+	}
+
+	for _, p := range pairs {
+		if p == nil || p.Clone1 == nil || p.Clone2 == nil {
+			continue
+		}
+		addClone(p.Clone1)
+		addClone(p.Clone2)
+		key := clonePairKey(p.Clone1, p.Clone2)
+		if old, ok := simMap[key]; !ok || p.Similarity > old {
+			simMap[key] = p.Similarity
+			typeMap[key] = p.Type
+		}
+		if p.Similarity >= cg.threshold {
+			neighbors[p.Clone1.ID] = append(neighbors[p.Clone1.ID], p.Clone2.ID)
+			neighbors[p.Clone2.ID] = append(neighbors[p.Clone2.ID], p.Clone1.ID)
+		}
+	}
+
+	if len(clones) == 0 {
+		return []*domain.CloneGroup{}
+	}
+
+	// Sort clones for deterministic processing
+	sort.Slice(clones, func(i, j int) bool { return cloneLess(clones[i], clones[j]) })
+
+	// Build clone ID to clone map
+	cloneByID := make(map[int]*domain.Clone)
+	for _, clone := range clones {
+		cloneByID[clone.ID] = clone
+	}
+
+	// BFS expansion from each unassigned clone
+	assigned := make(map[int]bool)
+	groups := make([]*domain.CloneGroup, 0)
+	groupID := 0
+
+	for _, seed := range clones {
+		if assigned[seed.ID] {
+			continue
+		}
+
+		// Start new group with seed
+		members := []*domain.Clone{seed}
+		assigned[seed.ID] = true
+
+		// BFS queue: neighbor IDs to consider
+		queue := list.New()
+		visited := make(map[int]bool)
+		visited[seed.ID] = true
+
+		// Add seed's neighbors to queue
+		for _, nid := range neighbors[seed.ID] {
+			if !visited[nid] && !assigned[nid] {
+				queue.PushBack(nid)
+				visited[nid] = true
+			}
+		}
+
+		// BFS expansion
+		for queue.Len() > 0 {
+			e := queue.Front()
+			queue.Remove(e)
+			candidateID := e.Value.(int)
+
+			if assigned[candidateID] {
+				continue
+			}
+
+			candidate := cloneByID[candidateID]
+			if candidate == nil {
+				continue
+			}
+
+			// Check if candidate is similar to ALL current members
+			if cg.isSimilarToAll(candidate, members, simMap) {
+				members = append(members, candidate)
+				assigned[candidateID] = true
+
+				// Add candidate's neighbors to queue
+				for _, nid := range neighbors[candidateID] {
+					if !visited[nid] && !assigned[nid] {
+						queue.PushBack(nid)
+						visited[nid] = true
+					}
+				}
+			}
+		}
+
+		// Only keep groups with at least 2 members
+		if len(members) >= 2 {
+			sort.Slice(members, func(i, j int) bool { return cloneLess(members[i], members[j]) })
+			g := &domain.CloneGroup{
+				ID:     groupID,
+				Clones: make([]*domain.Clone, 0, len(members)),
+				Size:   len(members),
+			}
+			groupID++
+			for _, clone := range members {
+				g.AddClone(clone)
+			}
+			g.Similarity = averageGroupSimilarityClones(simMap, members)
+			g.Type = majorityCloneTypeClones(typeMap, members)
+			groups = append(groups, g)
+		}
+	}
+
+	// Sort groups by similarity then size
+	sort.Slice(groups, func(i, j int) bool {
+		if !almostEqual(groups[i].Similarity, groups[j].Similarity) {
+			return groups[i].Similarity > groups[j].Similarity
+		}
+		if groups[i].Size != groups[j].Size {
+			return groups[i].Size > groups[j].Size
+		}
+		if len(groups[i].Clones) == 0 || len(groups[j].Clones) == 0 {
+			return false
+		}
+		return cloneLess(groups[i].Clones[0], groups[j].Clones[0])
+	})
+
+	return groups
+}
+
+// isSimilarToAll checks if candidate is similar to all members above threshold
+func (cg *CentroidGrouping) isSimilarToAll(candidate *domain.Clone, members []*domain.Clone, simMap map[string]float64) bool {
+	for _, member := range members {
+		if cloneSimilarity(simMap, candidate, member) < cg.threshold {
+			return false
+		}
+	}
+	return true
 }
 
 // Helper functions
