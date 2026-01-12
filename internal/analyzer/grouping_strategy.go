@@ -502,6 +502,14 @@ func (s *StarMedoidGrouping) GroupClones(pairs []*domain.ClonePair) []*domain.Cl
 			g.medoid = s.findMedoid(g.members, simMap)
 		}
 
+		// Build clone-to-group map for O(1) lookup
+		cloneToGroup := make(map[int]int)
+		for gi, g := range groups {
+			for _, m := range g.members {
+				cloneToGroup[m.ID] = gi
+			}
+		}
+
 		// Reassign clones to closest medoid
 		newAssignment := make(map[int]int) // clone ID -> group index
 		changed := 0
@@ -521,25 +529,17 @@ func (s *StarMedoidGrouping) GroupClones(pairs []*domain.ClonePair) []*domain.Cl
 				}
 			}
 
-			// Find current group
-			currentGroup := -1
-			for gi, g := range groups {
-				for _, m := range g.members {
-					if m.ID == clone.ID {
-						currentGroup = gi
-						break
-					}
-				}
-				if currentGroup >= 0 {
-					break
-				}
-			}
+			// Find current group using O(1) lookup
+			currentGroup, inGroup := cloneToGroup[clone.ID]
 
 			if bestGroup >= 0 {
 				newAssignment[clone.ID] = bestGroup
 				if bestGroup != currentGroup {
 					changed++
 				}
+			} else if inGroup {
+				// Clone doesn't match any medoid above threshold, keep in current group
+				newAssignment[clone.ID] = currentGroup
 			}
 		}
 
@@ -811,6 +811,7 @@ func (c *CompleteLinkageGrouping) bronKerbosch(R, P, X []int, adj map[int]map[in
 }
 
 // choosePivot selects a pivot vertex that maximizes connections to P
+// Ties are broken by choosing the smallest ID for deterministic behavior
 func (c *CompleteLinkageGrouping) choosePivot(P, X []int, adj map[int]map[int]bool) int {
 	maxConnections := -1
 	pivot := -1
@@ -825,7 +826,8 @@ func (c *CompleteLinkageGrouping) choosePivot(P, X []int, adj map[int]map[int]bo
 				connections++
 			}
 		}
-		if connections > maxConnections {
+		// Use smallest ID as tie-breaker for determinism
+		if connections > maxConnections || (connections == maxConnections && (pivot == -1 || u < pivot)) {
 			maxConnections = connections
 			pivot = u
 		}
@@ -922,6 +924,11 @@ func (cg *CentroidGrouping) GroupClones(pairs []*domain.ClonePair) []*domain.Clo
 	cloneByID := make(map[int]*domain.Clone)
 	for _, clone := range clones {
 		cloneByID[clone.ID] = clone
+	}
+
+	// Sort neighbors for deterministic BFS traversal
+	for id := range neighbors {
+		sort.Ints(neighbors[id])
 	}
 
 	// BFS expansion from each unassigned clone
