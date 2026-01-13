@@ -13,6 +13,9 @@ func TestCreateGroupingStrategy(t *testing.T) {
 	}{
 		{GroupingModeConnected, "Connected Components"},
 		{GroupingModeKCore, "2-Core"},
+		{GroupingModeStarMedoid, "Star/Medoid"},
+		{GroupingModeCompleteLinkage, "Complete Linkage"},
+		{GroupingModeCentroid, "Centroid"},
 		{"unknown", "Connected Components"}, // Default fallback
 	}
 
@@ -372,5 +375,306 @@ func TestMajorityCloneTypeClonesEmpty(t *testing.T) {
 	// Default fallback
 	if majority != domain.Type3Clone {
 		t.Errorf("Expected Type3Clone as fallback, got %v", majority)
+	}
+}
+
+// StarMedoidGrouping tests
+
+func TestNewStarMedoidGrouping(t *testing.T) {
+	grouping := NewStarMedoidGrouping(0.8)
+
+	if grouping.threshold != 0.8 {
+		t.Errorf("Expected threshold 0.8, got %f", grouping.threshold)
+	}
+	if grouping.GetName() != "Star/Medoid" {
+		t.Errorf("Expected name 'Star/Medoid', got %s", grouping.GetName())
+	}
+}
+
+func TestStarMedoidGroupingEmpty(t *testing.T) {
+	grouping := NewStarMedoidGrouping(0.8)
+	groups := grouping.GroupClones([]*domain.ClonePair{})
+
+	if len(groups) != 0 {
+		t.Errorf("Expected 0 groups for empty input, got %d", len(groups))
+	}
+}
+
+func TestStarMedoidGroupingSinglePair(t *testing.T) {
+	grouping := NewStarMedoidGrouping(0.8)
+
+	clone1 := &domain.Clone{
+		ID:       1,
+		Location: &domain.CloneLocation{FilePath: "a.js", StartLine: 1, EndLine: 10},
+	}
+	clone2 := &domain.Clone{
+		ID:       2,
+		Location: &domain.CloneLocation{FilePath: "b.js", StartLine: 1, EndLine: 10},
+	}
+
+	pairs := []*domain.ClonePair{
+		{
+			ID:         1,
+			Clone1:     clone1,
+			Clone2:     clone2,
+			Similarity: 0.9,
+			Type:       domain.Type1Clone,
+		},
+	}
+
+	groups := grouping.GroupClones(pairs)
+
+	if len(groups) != 1 {
+		t.Errorf("Expected 1 group, got %d", len(groups))
+	}
+	if groups[0].Size != 2 {
+		t.Errorf("Expected group size 2, got %d", groups[0].Size)
+	}
+}
+
+func TestStarMedoidGroupingMedoidSelection(t *testing.T) {
+	grouping := NewStarMedoidGrouping(0.7)
+
+	// Clone 2 should be medoid as it has highest average similarity to others
+	clone1 := &domain.Clone{ID: 1, Location: &domain.CloneLocation{FilePath: "a.js", StartLine: 1, EndLine: 10}}
+	clone2 := &domain.Clone{ID: 2, Location: &domain.CloneLocation{FilePath: "b.js", StartLine: 1, EndLine: 10}}
+	clone3 := &domain.Clone{ID: 3, Location: &domain.CloneLocation{FilePath: "c.js", StartLine: 1, EndLine: 10}}
+
+	pairs := []*domain.ClonePair{
+		{ID: 1, Clone1: clone1, Clone2: clone2, Similarity: 0.9, Type: domain.Type1Clone},
+		{ID: 2, Clone1: clone2, Clone2: clone3, Similarity: 0.95, Type: domain.Type1Clone},
+		{ID: 3, Clone1: clone1, Clone2: clone3, Similarity: 0.75, Type: domain.Type2Clone},
+	}
+
+	groups := grouping.GroupClones(pairs)
+
+	if len(groups) != 1 {
+		t.Errorf("Expected 1 group, got %d", len(groups))
+	}
+	if len(groups) > 0 && groups[0].Size != 3 {
+		t.Errorf("Expected group size 3, got %d", groups[0].Size)
+	}
+}
+
+func TestStarMedoidGroupingBelowThreshold(t *testing.T) {
+	grouping := NewStarMedoidGrouping(0.9)
+
+	clone1 := &domain.Clone{ID: 1, Location: &domain.CloneLocation{FilePath: "a.js", StartLine: 1, EndLine: 10}}
+	clone2 := &domain.Clone{ID: 2, Location: &domain.CloneLocation{FilePath: "b.js", StartLine: 1, EndLine: 10}}
+
+	pairs := []*domain.ClonePair{
+		{ID: 1, Clone1: clone1, Clone2: clone2, Similarity: 0.8, Type: domain.Type2Clone},
+	}
+
+	groups := grouping.GroupClones(pairs)
+
+	if len(groups) != 0 {
+		t.Errorf("Expected 0 groups (below threshold), got %d", len(groups))
+	}
+}
+
+// CompleteLinkageGrouping tests
+
+func TestNewCompleteLinkageGrouping(t *testing.T) {
+	grouping := NewCompleteLinkageGrouping(0.8)
+
+	if grouping.threshold != 0.8 {
+		t.Errorf("Expected threshold 0.8, got %f", grouping.threshold)
+	}
+	if grouping.GetName() != "Complete Linkage" {
+		t.Errorf("Expected name 'Complete Linkage', got %s", grouping.GetName())
+	}
+}
+
+func TestCompleteLinkageGroupingEmpty(t *testing.T) {
+	grouping := NewCompleteLinkageGrouping(0.8)
+	groups := grouping.GroupClones([]*domain.ClonePair{})
+
+	if len(groups) != 0 {
+		t.Errorf("Expected 0 groups for empty input, got %d", len(groups))
+	}
+}
+
+func TestCompleteLinkageGroupingTriangle(t *testing.T) {
+	grouping := NewCompleteLinkageGrouping(0.8)
+
+	// Three clones forming a complete triangle (clique)
+	clone1 := &domain.Clone{ID: 1, Location: &domain.CloneLocation{FilePath: "a.js", StartLine: 1, EndLine: 10}}
+	clone2 := &domain.Clone{ID: 2, Location: &domain.CloneLocation{FilePath: "b.js", StartLine: 1, EndLine: 10}}
+	clone3 := &domain.Clone{ID: 3, Location: &domain.CloneLocation{FilePath: "c.js", StartLine: 1, EndLine: 10}}
+
+	pairs := []*domain.ClonePair{
+		{ID: 1, Clone1: clone1, Clone2: clone2, Similarity: 0.9, Type: domain.Type1Clone},
+		{ID: 2, Clone1: clone2, Clone2: clone3, Similarity: 0.9, Type: domain.Type1Clone},
+		{ID: 3, Clone1: clone1, Clone2: clone3, Similarity: 0.9, Type: domain.Type1Clone},
+	}
+
+	groups := grouping.GroupClones(pairs)
+
+	if len(groups) != 1 {
+		t.Errorf("Expected 1 group (triangle is a clique), got %d", len(groups))
+	}
+	if len(groups) > 0 && groups[0].Size != 3 {
+		t.Errorf("Expected group size 3, got %d", groups[0].Size)
+	}
+}
+
+func TestCompleteLinkageGroupingNonClique(t *testing.T) {
+	grouping := NewCompleteLinkageGrouping(0.8)
+
+	// Three clones but only 2 edges: 1-2, 2-3 (not a complete clique)
+	clone1 := &domain.Clone{ID: 1, Location: &domain.CloneLocation{FilePath: "a.js", StartLine: 1, EndLine: 10}}
+	clone2 := &domain.Clone{ID: 2, Location: &domain.CloneLocation{FilePath: "b.js", StartLine: 1, EndLine: 10}}
+	clone3 := &domain.Clone{ID: 3, Location: &domain.CloneLocation{FilePath: "c.js", StartLine: 1, EndLine: 10}}
+
+	pairs := []*domain.ClonePair{
+		{ID: 1, Clone1: clone1, Clone2: clone2, Similarity: 0.9, Type: domain.Type1Clone},
+		{ID: 2, Clone1: clone2, Clone2: clone3, Similarity: 0.9, Type: domain.Type1Clone},
+		// Missing clone1-clone3 edge
+	}
+
+	groups := grouping.GroupClones(pairs)
+
+	// Should form 2 cliques of size 2: (1,2) and (2,3)
+	if len(groups) != 2 {
+		t.Errorf("Expected 2 groups (two overlapping pairs), got %d", len(groups))
+	}
+}
+
+func TestCompleteLinkageGroupingBelowThreshold(t *testing.T) {
+	grouping := NewCompleteLinkageGrouping(0.9)
+
+	clone1 := &domain.Clone{ID: 1, Location: &domain.CloneLocation{FilePath: "a.js", StartLine: 1, EndLine: 10}}
+	clone2 := &domain.Clone{ID: 2, Location: &domain.CloneLocation{FilePath: "b.js", StartLine: 1, EndLine: 10}}
+
+	pairs := []*domain.ClonePair{
+		{ID: 1, Clone1: clone1, Clone2: clone2, Similarity: 0.8, Type: domain.Type2Clone},
+	}
+
+	groups := grouping.GroupClones(pairs)
+
+	if len(groups) != 0 {
+		t.Errorf("Expected 0 groups (below threshold), got %d", len(groups))
+	}
+}
+
+// CentroidGrouping tests
+
+func TestNewCentroidGrouping(t *testing.T) {
+	grouping := NewCentroidGrouping(0.8)
+
+	if grouping.threshold != 0.8 {
+		t.Errorf("Expected threshold 0.8, got %f", grouping.threshold)
+	}
+	if grouping.GetName() != "Centroid" {
+		t.Errorf("Expected name 'Centroid', got %s", grouping.GetName())
+	}
+}
+
+func TestCentroidGroupingEmpty(t *testing.T) {
+	grouping := NewCentroidGrouping(0.8)
+	groups := grouping.GroupClones([]*domain.ClonePair{})
+
+	if len(groups) != 0 {
+		t.Errorf("Expected 0 groups for empty input, got %d", len(groups))
+	}
+}
+
+func TestCentroidGroupingSinglePair(t *testing.T) {
+	grouping := NewCentroidGrouping(0.8)
+
+	clone1 := &domain.Clone{
+		ID:       1,
+		Location: &domain.CloneLocation{FilePath: "a.js", StartLine: 1, EndLine: 10},
+	}
+	clone2 := &domain.Clone{
+		ID:       2,
+		Location: &domain.CloneLocation{FilePath: "b.js", StartLine: 1, EndLine: 10},
+	}
+
+	pairs := []*domain.ClonePair{
+		{
+			ID:         1,
+			Clone1:     clone1,
+			Clone2:     clone2,
+			Similarity: 0.9,
+			Type:       domain.Type1Clone,
+		},
+	}
+
+	groups := grouping.GroupClones(pairs)
+
+	if len(groups) != 1 {
+		t.Errorf("Expected 1 group, got %d", len(groups))
+	}
+	if groups[0].Size != 2 {
+		t.Errorf("Expected group size 2, got %d", groups[0].Size)
+	}
+}
+
+func TestCentroidGroupingTransitivityRejection(t *testing.T) {
+	grouping := NewCentroidGrouping(0.8)
+
+	// A~B, B~C but A is NOT similar to C
+	// Centroid should reject C from joining the group with A and B
+	clone1 := &domain.Clone{ID: 1, Location: &domain.CloneLocation{FilePath: "a.js", StartLine: 1, EndLine: 10}}
+	clone2 := &domain.Clone{ID: 2, Location: &domain.CloneLocation{FilePath: "b.js", StartLine: 1, EndLine: 10}}
+	clone3 := &domain.Clone{ID: 3, Location: &domain.CloneLocation{FilePath: "c.js", StartLine: 1, EndLine: 10}}
+
+	pairs := []*domain.ClonePair{
+		{ID: 1, Clone1: clone1, Clone2: clone2, Similarity: 0.9, Type: domain.Type1Clone},
+		{ID: 2, Clone1: clone2, Clone2: clone3, Similarity: 0.9, Type: domain.Type1Clone},
+		{ID: 3, Clone1: clone1, Clone2: clone3, Similarity: 0.5, Type: domain.Type3Clone}, // Below threshold
+	}
+
+	groups := grouping.GroupClones(pairs)
+
+	// Clone 3 should NOT be in the same group as clone 1 because similarity(1,3) < threshold
+	// Depending on processing order, we may have different results, but clone 1-2-3 should NOT be in one group
+	for _, g := range groups {
+		if g.Size == 3 {
+			t.Errorf("Expected no group of size 3 due to transitive rejection, but found one")
+		}
+	}
+}
+
+func TestCentroidGroupingAllSimilar(t *testing.T) {
+	grouping := NewCentroidGrouping(0.8)
+
+	// All clones similar to each other (complete clique)
+	clone1 := &domain.Clone{ID: 1, Location: &domain.CloneLocation{FilePath: "a.js", StartLine: 1, EndLine: 10}}
+	clone2 := &domain.Clone{ID: 2, Location: &domain.CloneLocation{FilePath: "b.js", StartLine: 1, EndLine: 10}}
+	clone3 := &domain.Clone{ID: 3, Location: &domain.CloneLocation{FilePath: "c.js", StartLine: 1, EndLine: 10}}
+
+	pairs := []*domain.ClonePair{
+		{ID: 1, Clone1: clone1, Clone2: clone2, Similarity: 0.9, Type: domain.Type1Clone},
+		{ID: 2, Clone1: clone2, Clone2: clone3, Similarity: 0.9, Type: domain.Type1Clone},
+		{ID: 3, Clone1: clone1, Clone2: clone3, Similarity: 0.85, Type: domain.Type2Clone},
+	}
+
+	groups := grouping.GroupClones(pairs)
+
+	if len(groups) != 1 {
+		t.Errorf("Expected 1 group, got %d", len(groups))
+	}
+	if len(groups) > 0 && groups[0].Size != 3 {
+		t.Errorf("Expected group size 3, got %d", groups[0].Size)
+	}
+}
+
+func TestCentroidGroupingBelowThreshold(t *testing.T) {
+	grouping := NewCentroidGrouping(0.9)
+
+	clone1 := &domain.Clone{ID: 1, Location: &domain.CloneLocation{FilePath: "a.js", StartLine: 1, EndLine: 10}}
+	clone2 := &domain.Clone{ID: 2, Location: &domain.CloneLocation{FilePath: "b.js", StartLine: 1, EndLine: 10}}
+
+	pairs := []*domain.ClonePair{
+		{ID: 1, Clone1: clone1, Clone2: clone2, Similarity: 0.8, Type: domain.Type2Clone},
+	}
+
+	groups := grouping.GroupClones(pairs)
+
+	if len(groups) != 0 {
+		t.Errorf("Expected 0 groups (below threshold), got %d", len(groups))
 	}
 }
