@@ -59,6 +59,9 @@ type Config struct {
 	// Architecture holds architecture validation configuration
 	Architecture ArchitectureConfig `json:"architecture,omitempty" mapstructure:"architecture" yaml:"architecture"`
 
+	// ModuleAnalysis holds module analysis configuration
+	ModuleAnalysis ModuleAnalysisConfig `json:"moduleAnalysis,omitempty" mapstructure:"module_analysis" yaml:"module_analysis"`
+
 	// Output holds output formatting configuration
 	Output OutputConfig `json:"output" mapstructure:"output" yaml:"output"`
 
@@ -230,6 +233,15 @@ func DefaultConfig() *Config {
 			ForbiddenPatterns:               []string{},
 			StrictMode:                      false,
 			FailOnViolations:                false,
+		},
+
+		// Module analysis configuration
+		ModuleAnalysis: ModuleAnalysisConfig{
+			Enabled:            false, // Disabled by default - opt-in feature
+			IncludeBuiltins:    true,
+			ResolveRelative:    false,
+			IncludeTypeImports: true,
+			AliasPatterns:      []string{"@/", "~/"},
 		},
 
 		Output: OutputConfig{
@@ -658,6 +670,24 @@ type ArchitectureConfig struct {
 	// Strict mode enforcement
 	StrictMode       bool `json:"strict_mode" mapstructure:"strict_mode" yaml:"strict_mode"`
 	FailOnViolations bool `json:"fail_on_violations" mapstructure:"fail_on_violations" yaml:"fail_on_violations"`
+}
+
+// ModuleAnalysisConfig holds configuration for module import/export analysis
+type ModuleAnalysisConfig struct {
+	// Enabled controls whether module analysis is performed
+	Enabled bool `json:"enabled" mapstructure:"enabled" yaml:"enabled"`
+
+	// IncludeBuiltins includes Node.js builtin modules in analysis
+	IncludeBuiltins bool `json:"include_builtins" mapstructure:"include_builtins" yaml:"include_builtins"`
+
+	// ResolveRelative enables resolution of relative import paths
+	ResolveRelative bool `json:"resolve_relative" mapstructure:"resolve_relative" yaml:"resolve_relative"`
+
+	// IncludeTypeImports includes TypeScript type imports
+	IncludeTypeImports bool `json:"include_type_imports" mapstructure:"include_type_imports" yaml:"include_type_imports"`
+
+	// AliasPatterns are path alias patterns to recognize (@/, ~/, etc.)
+	AliasPatterns []string `json:"alias_patterns" mapstructure:"alias_patterns" yaml:"alias_patterns"`
 }
 
 // LayerDefinition defines an architectural layer

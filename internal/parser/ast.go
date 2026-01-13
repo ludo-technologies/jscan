@@ -84,6 +84,7 @@ const (
 	NodeExportNamedDeclaration   NodeType = "ExportNamedDeclaration"
 	NodeExportDefaultDeclaration NodeType = "ExportDefaultDeclaration"
 	NodeExportAllDeclaration     NodeType = "ExportAllDeclaration"
+	NodeExportSpecifier          NodeType = "ExportSpecifier"
 
 	// Module system (CommonJS)
 	NodeRequireCall   NodeType = "RequireCall"

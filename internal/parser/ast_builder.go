@@ -118,7 +118,7 @@ func (b *ASTBuilder) buildNode(tsNode *sitter.Node) *Node {
 		return b.buildAwaitExpression(tsNode)
 	case "yield_expression":
 		return b.buildYieldExpression(tsNode)
-	case "identifier":
+	case "identifier", "property_identifier", "shorthand_property_identifier":
 		return b.buildIdentifier(tsNode)
 	case "string", "number", "true", "false", "null":
 		return b.buildLiteral(tsNode)
@@ -922,11 +922,46 @@ func (b *ASTBuilder) buildImportStatement(tsNode *sitter.Node) *Node {
 		node.Source = b.buildNode(sourceNode)
 	}
 
-	// Extract specifiers
+	// Extract specifiers from different tree-sitter node types
 	for i := 0; i < int(tsNode.ChildCount()); i++ {
 		child := tsNode.Child(i)
-		if child != nil && (child.Type() == "import_specifier" || child.Type() == "namespace_import") {
-			specNode := b.buildNode(child)
+		if child == nil {
+			continue
+		}
+
+		switch child.Type() {
+		case "import_clause":
+			// Handle import clause (contains default import and/or named imports)
+			b.extractImportClause(child, node)
+
+		case "namespace_import":
+			// Handle: import * as name from 'module'
+			specNode := NewNode(NodeImportNamespaceSpecifier)
+			specNode.Location = b.getLocation(child)
+			// Find the identifier (the "as name" part)
+			for j := 0; j < int(child.ChildCount()); j++ {
+				grandchild := child.Child(j)
+				if grandchild != nil && grandchild.Type() == "identifier" {
+					specNode.Name = grandchild.Content(b.source)
+				}
+			}
+			node.Specifiers = append(node.Specifiers, specNode)
+
+		case "named_imports":
+			// Handle: import { a, b } from 'module'
+			for j := 0; j < int(child.ChildCount()); j++ {
+				importSpec := child.Child(j)
+				if importSpec != nil && importSpec.Type() == "import_specifier" {
+					specNode := b.buildImportSpecifier(importSpec)
+					if specNode != nil {
+						node.Specifiers = append(node.Specifiers, specNode)
+					}
+				}
+			}
+
+		case "import_specifier":
+			// Direct import specifier
+			specNode := b.buildImportSpecifier(child)
 			if specNode != nil {
 				node.Specifiers = append(node.Specifiers, specNode)
 			}
@@ -936,14 +971,118 @@ func (b *ASTBuilder) buildImportStatement(tsNode *sitter.Node) *Node {
 	return node
 }
 
+// extractImportClause extracts specifiers from an import_clause node
+func (b *ASTBuilder) extractImportClause(clauseNode *sitter.Node, node *Node) {
+	for i := 0; i < int(clauseNode.ChildCount()); i++ {
+		child := clauseNode.Child(i)
+		if child == nil {
+			continue
+		}
+
+		switch child.Type() {
+		case "identifier":
+			// Default import: import React from 'react'
+			specNode := NewNode(NodeImportDefaultSpecifier)
+			specNode.Location = b.getLocation(child)
+			specNode.Name = child.Content(b.source)
+			node.Specifiers = append(node.Specifiers, specNode)
+
+		case "namespace_import":
+			// Namespace import: import * as React from 'react'
+			specNode := NewNode(NodeImportNamespaceSpecifier)
+			specNode.Location = b.getLocation(child)
+			for j := 0; j < int(child.ChildCount()); j++ {
+				grandchild := child.Child(j)
+				if grandchild != nil && grandchild.Type() == "identifier" {
+					specNode.Name = grandchild.Content(b.source)
+				}
+			}
+			node.Specifiers = append(node.Specifiers, specNode)
+
+		case "named_imports":
+			// Named imports: import { useState, useEffect } from 'react'
+			for j := 0; j < int(child.ChildCount()); j++ {
+				importSpec := child.Child(j)
+				if importSpec != nil && importSpec.Type() == "import_specifier" {
+					specNode := b.buildImportSpecifier(importSpec)
+					if specNode != nil {
+						node.Specifiers = append(node.Specifiers, specNode)
+					}
+				}
+			}
+		}
+	}
+}
+
+// buildImportSpecifier builds an import specifier node
+func (b *ASTBuilder) buildImportSpecifier(tsNode *sitter.Node) *Node {
+	specNode := NewNode(NodeImportSpecifier)
+	specNode.Location = b.getLocation(tsNode)
+
+	// An import specifier can have: name or name as alias
+	identifiers := []*sitter.Node{}
+	for i := 0; i < int(tsNode.ChildCount()); i++ {
+		child := tsNode.Child(i)
+		if child != nil && child.Type() == "identifier" {
+			identifiers = append(identifiers, child)
+		}
+	}
+
+	if len(identifiers) == 1 {
+		// import { foo } - same name for imported and local
+		specNode.Name = identifiers[0].Content(b.source)
+		specNode.Imported = NewNode(NodeIdentifier)
+		specNode.Imported.Name = specNode.Name
+	} else if len(identifiers) == 2 {
+		// import { foo as bar } - first is imported, second is local
+		specNode.Imported = NewNode(NodeIdentifier)
+		specNode.Imported.Name = identifiers[0].Content(b.source)
+		specNode.Name = identifiers[1].Content(b.source)
+	}
+
+	return specNode
+}
+
 // buildExportStatement builds an export statement node
 func (b *ASTBuilder) buildExportStatement(tsNode *sitter.Node) *Node {
 	node := NewNode(NodeExportNamedDeclaration)
 	node.Location = b.getLocation(tsNode)
 
-	// Extract declaration
+	// Check for default, export *, etc.
+	hasDefault := false
+	hasWildcard := false
+
+	for i := 0; i < int(tsNode.ChildCount()); i++ {
+		child := tsNode.Child(i)
+		if child == nil {
+			continue
+		}
+		switch child.Type() {
+		case "default":
+			hasDefault = true
+		case "*":
+			hasWildcard = true
+		case "export_clause":
+			// Handle: export { foo, bar } or export { foo as bar }
+			b.extractExportClause(child, node)
+		}
+	}
+
+	// Set node type based on export kind
+	if hasDefault {
+		node.Type = NodeExportDefaultDeclaration
+	} else if hasWildcard {
+		node.Type = NodeExportAllDeclaration
+	}
+
+	// Extract declaration (for named and default exports)
 	if declNode := b.getChildByFieldName(tsNode, "declaration"); declNode != nil {
 		node.Declaration = b.buildNode(declNode)
+	}
+
+	// Extract value (for default exports like: export default function() {})
+	if valueNode := b.getChildByFieldName(tsNode, "value"); valueNode != nil {
+		node.Declaration = b.buildNode(valueNode)
 	}
 
 	// Extract source if re-exporting
@@ -952,6 +1091,44 @@ func (b *ASTBuilder) buildExportStatement(tsNode *sitter.Node) *Node {
 	}
 
 	return node
+}
+
+// extractExportClause extracts specifiers from an export_clause node
+func (b *ASTBuilder) extractExportClause(clauseNode *sitter.Node, node *Node) {
+	for i := 0; i < int(clauseNode.ChildCount()); i++ {
+		child := clauseNode.Child(i)
+		if child == nil {
+			continue
+		}
+
+		if child.Type() == "export_specifier" {
+			specNode := NewNode(NodeExportSpecifier)
+			specNode.Location = b.getLocation(child)
+
+			// Extract the identifiers (local and exported names)
+			identifiers := []*sitter.Node{}
+			for j := 0; j < int(child.ChildCount()); j++ {
+				grandchild := child.Child(j)
+				if grandchild != nil && grandchild.Type() == "identifier" {
+					identifiers = append(identifiers, grandchild)
+				}
+			}
+
+			if len(identifiers) == 1 {
+				// export { foo } - same name
+				specNode.Name = identifiers[0].Content(b.source)
+				specNode.Local = NewNode(NodeIdentifier)
+				specNode.Local.Name = specNode.Name
+			} else if len(identifiers) == 2 {
+				// export { foo as bar } - first is local, second is exported
+				specNode.Local = NewNode(NodeIdentifier)
+				specNode.Local.Name = identifiers[0].Content(b.source)
+				specNode.Name = identifiers[1].Content(b.source)
+			}
+
+			node.Specifiers = append(node.Specifiers, specNode)
+		}
+	}
 }
 
 // buildBlockStatement builds a block statement node
