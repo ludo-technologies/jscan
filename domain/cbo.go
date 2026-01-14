@@ -120,7 +120,7 @@ type CBOService interface {
 	// Analyze performs CBO analysis on the given request
 	Analyze(ctx context.Context, req CBORequest) (*CBOResponse, error)
 
-	// AnalyzeFile analyzes a single Python file
+	// AnalyzeFile analyzes a single JavaScript/TypeScript file
 	AnalyzeFile(ctx context.Context, filePath string, req CBORequest) (*CBOResponse, error)
 }
 
