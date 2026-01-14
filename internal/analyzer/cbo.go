@@ -426,77 +426,82 @@ func normalizeModuleName(source string) string {
 	return name
 }
 
+// Package-level maps for builtin lookups (avoid allocation on each call)
+var builtinClasses = map[string]bool{
+	"Array": true, "Object": true, "String": true, "Number": true,
+	"Boolean": true, "Function": true, "Symbol": true, "BigInt": true,
+	"Date": true, "RegExp": true, "Error": true, "TypeError": true,
+	"RangeError": true, "SyntaxError": true, "ReferenceError": true,
+	"Map": true, "Set": true, "WeakMap": true, "WeakSet": true,
+	"Promise": true, "Proxy": true, "Reflect": true,
+	"ArrayBuffer": true, "SharedArrayBuffer": true, "DataView": true,
+	"Int8Array": true, "Uint8Array": true, "Uint8ClampedArray": true,
+	"Int16Array": true, "Uint16Array": true,
+	"Int32Array": true, "Uint32Array": true,
+	"Float32Array": true, "Float64Array": true,
+	"BigInt64Array": true, "BigUint64Array": true,
+	"JSON": true, "Math": true, "Intl": true,
+	"URL": true, "URLSearchParams": true,
+	"EventTarget": true, "Event": true, "CustomEvent": true,
+	"AbortController": true, "AbortSignal": true,
+	"TextEncoder": true, "TextDecoder": true,
+	"Headers": true, "Request": true, "Response": true,
+	"FormData": true, "Blob": true, "File": true, "FileReader": true,
+}
+
+var builtinObjects = map[string]bool{
+	"console": true, "process": true, "global": true, "globalThis": true,
+	"window": true, "document": true, "navigator": true, "location": true,
+	"localStorage": true, "sessionStorage": true,
+	"JSON": true, "Math": true, "Intl": true,
+	"Object": true, "Array": true, "String": true, "Number": true,
+	"Boolean": true, "Date": true, "RegExp": true,
+	"Promise": true, "Proxy": true, "Reflect": true,
+	"Buffer": true, "require": true, "module": true, "exports": true,
+	"__dirname": true, "__filename": true,
+	"setTimeout": true, "setInterval": true, "setImmediate": true,
+	"clearTimeout": true, "clearInterval": true, "clearImmediate": true,
+	"fetch": true, "XMLHttpRequest": true,
+	"this": true, "super": true,
+}
+
+var primitiveTypes = map[string]bool{
+	"string": true, "number": true, "boolean": true, "void": true,
+	"null": true, "undefined": true, "never": true, "any": true,
+	"unknown": true, "object": true, "symbol": true, "bigint": true,
+}
+
+var builtinTypes = map[string]bool{
+	"Partial": true, "Required": true, "Readonly": true, "Record": true,
+	"Pick": true, "Omit": true, "Exclude": true, "Extract": true,
+	"NonNullable": true, "Parameters": true, "ConstructorParameters": true,
+	"ReturnType": true, "InstanceType": true, "ThisParameterType": true,
+	"OmitThisParameter": true, "ThisType": true,
+	"Uppercase": true, "Lowercase": true, "Capitalize": true, "Uncapitalize": true,
+	"Array": true, "Object": true, "String": true, "Number": true,
+	"Boolean": true, "Function": true, "Symbol": true, "BigInt": true,
+	"Date": true, "RegExp": true, "Error": true,
+	"Map": true, "Set": true, "WeakMap": true, "WeakSet": true,
+	"Promise": true, "PromiseLike": true,
+	"ArrayLike": true, "Iterable": true, "IterableIterator": true,
+}
+
 // isBuiltinClass returns true if the class is a JavaScript built-in
 func isBuiltinClass(name string) bool {
-	builtins := map[string]bool{
-		"Array": true, "Object": true, "String": true, "Number": true,
-		"Boolean": true, "Function": true, "Symbol": true, "BigInt": true,
-		"Date": true, "RegExp": true, "Error": true, "TypeError": true,
-		"RangeError": true, "SyntaxError": true, "ReferenceError": true,
-		"Map": true, "Set": true, "WeakMap": true, "WeakSet": true,
-		"Promise": true, "Proxy": true, "Reflect": true,
-		"ArrayBuffer": true, "SharedArrayBuffer": true, "DataView": true,
-		"Int8Array": true, "Uint8Array": true, "Uint8ClampedArray": true,
-		"Int16Array": true, "Uint16Array": true,
-		"Int32Array": true, "Uint32Array": true,
-		"Float32Array": true, "Float64Array": true,
-		"BigInt64Array": true, "BigUint64Array": true,
-		"JSON": true, "Math": true, "Intl": true,
-		"URL": true, "URLSearchParams": true,
-		"EventTarget": true, "Event": true, "CustomEvent": true,
-		"AbortController": true, "AbortSignal": true,
-		"TextEncoder": true, "TextDecoder": true,
-		"Headers": true, "Request": true, "Response": true,
-		"FormData": true, "Blob": true, "File": true, "FileReader": true,
-	}
-	return builtins[name]
+	return builtinClasses[name]
 }
 
 // isBuiltinObject returns true if the object is a JavaScript built-in
 func isBuiltinObject(name string) bool {
-	builtins := map[string]bool{
-		"console": true, "process": true, "global": true, "globalThis": true,
-		"window": true, "document": true, "navigator": true, "location": true,
-		"localStorage": true, "sessionStorage": true,
-		"JSON": true, "Math": true, "Intl": true,
-		"Object": true, "Array": true, "String": true, "Number": true,
-		"Boolean": true, "Date": true, "RegExp": true,
-		"Promise": true, "Proxy": true, "Reflect": true,
-		"Buffer": true, "require": true, "module": true, "exports": true,
-		"__dirname": true, "__filename": true,
-		"setTimeout": true, "setInterval": true, "setImmediate": true,
-		"clearTimeout": true, "clearInterval": true, "clearImmediate": true,
-		"fetch": true, "XMLHttpRequest": true,
-		"this": true, "super": true,
-	}
-	return builtins[name]
+	return builtinObjects[name]
 }
 
 // isPrimitiveType returns true if the type is a primitive TypeScript type
 func isPrimitiveType(name string) bool {
-	primitives := map[string]bool{
-		"string": true, "number": true, "boolean": true, "void": true,
-		"null": true, "undefined": true, "never": true, "any": true,
-		"unknown": true, "object": true, "symbol": true, "bigint": true,
-	}
-	return primitives[name]
+	return primitiveTypes[name]
 }
 
 // isBuiltinType returns true if the type is a built-in TypeScript utility type
 func isBuiltinType(name string) bool {
-	builtins := map[string]bool{
-		"Partial": true, "Required": true, "Readonly": true, "Record": true,
-		"Pick": true, "Omit": true, "Exclude": true, "Extract": true,
-		"NonNullable": true, "Parameters": true, "ConstructorParameters": true,
-		"ReturnType": true, "InstanceType": true, "ThisParameterType": true,
-		"OmitThisParameter": true, "ThisType": true,
-		"Uppercase": true, "Lowercase": true, "Capitalize": true, "Uncapitalize": true,
-		"Array": true, "Object": true, "String": true, "Number": true,
-		"Boolean": true, "Function": true, "Symbol": true, "BigInt": true,
-		"Date": true, "RegExp": true, "Error": true,
-		"Map": true, "Set": true, "WeakMap": true, "WeakSet": true,
-		"Promise": true, "PromiseLike": true,
-		"ArrayLike": true, "Iterable": true, "IterableIterator": true,
-	}
-	return builtins[name]
+	return builtinTypes[name]
 }

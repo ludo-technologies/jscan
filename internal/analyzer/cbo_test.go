@@ -65,14 +65,13 @@ import { helper } from './utils';
 	}
 
 	// Should have 3 unique import dependencies (react, lodash, utils)
-	if result.Metrics.ImportDependencies < 3 {
-		t.Errorf("Expected at least 3 import dependencies, got %d", result.Metrics.ImportDependencies)
+	if result.Metrics.ImportDependencies != 3 {
+		t.Errorf("Expected 3 import dependencies, got %d", result.Metrics.ImportDependencies)
 	}
 
-	// CouplingCount should be at least the import dependencies
-	if result.Metrics.CouplingCount < result.Metrics.ImportDependencies {
-		t.Errorf("CouplingCount (%d) should be >= ImportDependencies (%d)",
-			result.Metrics.CouplingCount, result.Metrics.ImportDependencies)
+	// CouplingCount should equal import dependencies in this case
+	if result.Metrics.CouplingCount != 3 {
+		t.Errorf("Expected CouplingCount 3, got %d", result.Metrics.CouplingCount)
 	}
 }
 
@@ -502,9 +501,9 @@ function doSomething() {
 		t.Fatalf("Failed to analyze: %v", err)
 	}
 
-	// Should have attribute access dependencies
-	if result.Metrics.AttributeAccessDependencies < 1 {
-		t.Errorf("Expected at least 1 attribute access dependency, got %d", result.Metrics.AttributeAccessDependencies)
+	// Should have 2 attribute access dependencies (user-service and logger)
+	if result.Metrics.AttributeAccessDependencies != 2 {
+		t.Errorf("Expected 2 attribute access dependencies, got %d", result.Metrics.AttributeAccessDependencies)
 	}
 }
 

@@ -99,7 +99,7 @@ func (s *CBOServiceImpl) Analyze(ctx context.Context, req domain.CBORequest) (*d
 		Errors:      errors,
 		GeneratedAt: time.Now().Format(time.RFC3339),
 		Version:     version.Version,
-		Config:      s.buildConfigForResponse(req),
+		Config:      s.buildConfigForResponse(&config, req),
 	}, nil
 }
 
@@ -243,14 +243,14 @@ func (s *CBOServiceImpl) generateSummary(classes []domain.ClassCoupling, filesPr
 	summary.MinCBO = minCBO
 
 	// Get most coupled classes (top 10)
-	sortedByCouplng := make([]domain.ClassCoupling, len(classes))
-	copy(sortedByCouplng, classes)
-	sort.Slice(sortedByCouplng, func(i, j int) bool {
-		return sortedByCouplng[i].Metrics.CouplingCount > sortedByCouplng[j].Metrics.CouplingCount
+	sortedByCoupling := make([]domain.ClassCoupling, len(classes))
+	copy(sortedByCoupling, classes)
+	sort.Slice(sortedByCoupling, func(i, j int) bool {
+		return sortedByCoupling[i].Metrics.CouplingCount > sortedByCoupling[j].Metrics.CouplingCount
 	})
 
-	maxMostCoupled := min(10, len(sortedByCouplng))
-	summary.MostCoupledClasses = sortedByCouplng[:maxMostCoupled]
+	maxMostCoupled := min(10, len(sortedByCoupling))
+	summary.MostCoupledClasses = sortedByCoupling[:maxMostCoupled]
 
 	return summary
 }
@@ -272,14 +272,14 @@ func (s *CBOServiceImpl) getCBORange(cbo int) string {
 }
 
 // buildConfigForResponse builds the configuration section for the response
-func (s *CBOServiceImpl) buildConfigForResponse(req domain.CBORequest) map[string]any {
+func (s *CBOServiceImpl) buildConfigForResponse(config *analyzer.CBOAnalyzerConfig, req domain.CBORequest) map[string]any {
 	return map[string]any{
-		"low_threshold":      s.config.LowThreshold,
-		"medium_threshold":   s.config.MediumThreshold,
-		"include_builtins":   s.config.IncludeBuiltins,
-		"include_type_imports": s.config.IncludeTypeImports,
-		"sort_by":            req.SortBy,
-		"min_cbo":            req.MinCBO,
-		"max_cbo":            req.MaxCBO,
+		"low_threshold":        config.LowThreshold,
+		"medium_threshold":     config.MediumThreshold,
+		"include_builtins":     config.IncludeBuiltins,
+		"include_type_imports": config.IncludeTypeImports,
+		"sort_by":              req.SortBy,
+		"min_cbo":              req.MinCBO,
+		"max_cbo":              req.MaxCBO,
 	}
 }
