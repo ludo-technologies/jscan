@@ -502,6 +502,32 @@ func TestDOTFormatterRankDir(t *testing.T) {
 	}
 }
 
+func TestDOTFormatterInvalidRankDir(t *testing.T) {
+	graph := domain.NewDependencyGraph()
+	graph.AddNode(&domain.ModuleNode{
+		ID:           "test.ts",
+		Name:         "test",
+		IsEntryPoint: true,
+	})
+
+	response := &domain.DependencyGraphResponse{
+		Graph:    graph,
+		Analysis: &domain.DependencyAnalysisResult{},
+	}
+
+	config := DefaultDOTFormatterConfig()
+	config.RankDir = "INVALID"
+	formatter := NewDOTFormatter(config)
+
+	_, err := formatter.FormatDependencyGraph(response)
+	if err == nil {
+		t.Error("Expected error for invalid RankDir")
+	}
+	if !strings.Contains(err.Error(), "invalid rank direction") {
+		t.Errorf("Expected 'invalid rank direction' in error, got: %v", err)
+	}
+}
+
 func TestDOTFormatterWriteDependencyGraph(t *testing.T) {
 	graph := domain.NewDependencyGraph()
 	graph.AddNode(&domain.ModuleNode{

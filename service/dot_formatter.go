@@ -83,10 +83,23 @@ func (f *DOTFormatter) FormatDependencyGraph(response *domain.DependencyGraphRes
 	return sb.String(), nil
 }
 
+// validRankDirs contains the valid Graphviz rank directions
+var validRankDirs = map[string]bool{
+	"TB": true, // Top to Bottom
+	"LR": true, // Left to Right
+	"BT": true, // Bottom to Top
+	"RL": true, // Right to Left
+}
+
 // WriteDependencyGraph writes a dependency graph as DOT to the writer
 func (f *DOTFormatter) WriteDependencyGraph(response *domain.DependencyGraphResponse, writer io.Writer) error {
 	if response == nil || response.Graph == nil {
 		return fmt.Errorf("nil response or graph")
+	}
+
+	// Validate RankDir
+	if !validRankDirs[f.config.RankDir] {
+		return fmt.Errorf("invalid rank direction %q: must be one of TB, LR, BT, RL", f.config.RankDir)
 	}
 
 	graph := response.Graph
@@ -104,8 +117,7 @@ func (f *DOTFormatter) WriteDependencyGraph(response *domain.DependencyGraphResp
 	}
 
 	// Build set of modules in cycles for quick lookup
-	cycleModules := make(map[string]int)       // module -> cycle index
-	cyclesByModule := make(map[string][]int)   // module -> list of cycle indices it appears in
+	cycleModules := make(map[string]int) // module -> cycle index
 	var cycles []domain.CircularDependency
 
 	if analysis != nil && analysis.CircularDependencies != nil &&
@@ -116,7 +128,6 @@ func (f *DOTFormatter) WriteDependencyGraph(response *domain.DependencyGraphResp
 				if _, exists := cycleModules[mod]; !exists {
 					cycleModules[mod] = i
 				}
-				cyclesByModule[mod] = append(cyclesByModule[mod], i)
 			}
 		}
 	}
@@ -509,12 +520,13 @@ func escapeDOTID(id string) string {
 // escapeDOTLabel escapes a string for use as a DOT label
 func escapeDOTLabel(label string) string {
 	// Escape special characters in labels
+	// Note: backslash must be first to avoid double-escaping
 	replacer := strings.NewReplacer(
+		"\\", "\\\\",
 		"\"", "\\\"",
 		"\n", "\\n",
 		"\r", "",
 		"\t", "\\t",
-		"\\", "\\\\",
 	)
 	return replacer.Replace(label)
 }
