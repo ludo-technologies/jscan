@@ -1,6 +1,7 @@
 package analyzer
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/ludo-technologies/jscan/domain"
@@ -252,7 +253,7 @@ func TestCycleBreakingSuggestions(t *testing.T) {
 	// Should suggest breaking the edge with lowest weight (b -> c)
 	found := false
 	for _, suggestion := range result.CycleBreakingSuggestions {
-		if contains(suggestion, "b") && contains(suggestion, "c") {
+		if strings.Contains(suggestion, "b") && strings.Contains(suggestion, "c") {
 			found = true
 			break
 		}
@@ -326,21 +327,8 @@ func TestGenerateCycleDescription(t *testing.T) {
 	if description == "" {
 		t.Error("Expected non-empty description")
 	}
-	if !contains(description, "3 modules") {
+	if !strings.Contains(description, "3 modules") {
 		t.Error("Expected description to mention 3 modules")
 	}
 }
 
-func contains(s, substr string) bool {
-	return len(s) >= len(substr) && (s == substr || len(substr) == 0 ||
-		(len(s) > 0 && len(substr) > 0 && findSubstring(s, substr)))
-}
-
-func findSubstring(s, substr string) bool {
-	for i := 0; i <= len(s)-len(substr); i++ {
-		if s[i:i+len(substr)] == substr {
-			return true
-		}
-	}
-	return false
-}

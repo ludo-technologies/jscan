@@ -71,8 +71,7 @@ func (c *CouplingMetricsCalculator) CalculateMetrics(graph *domain.DependencyGra
 		// Calculate distance from main sequence
 		distance := c.calculateDistance(instability, abstractness)
 
-		// Determine stability zone
-		zone := c.classifyStabilityZone(instability, abstractness, distance)
+		// Stability zone is calculated in CalculateCouplingAnalysis
 
 		// Assess risk level
 		riskLevel := c.assessRiskLevel(ca, ce, distance)
@@ -94,9 +93,6 @@ func (c *CouplingMetricsCalculator) CalculateMetrics(graph *domain.DependencyGra
 			Dependents:             dependents,
 			TransitiveDependencies: []string{}, // Can be computed separately if needed
 		}
-
-		// Add stability zone to a custom field (using existing fields)
-		_ = zone // Used for CouplingAnalysis
 	}
 
 	return metrics

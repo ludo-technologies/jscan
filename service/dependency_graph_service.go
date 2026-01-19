@@ -46,7 +46,6 @@ func NewDependencyGraphServiceWithDefaults() *DependencyGraphServiceImpl {
 
 // Analyze performs complete dependency graph analysis
 func (s *DependencyGraphServiceImpl) Analyze(ctx context.Context, req domain.DependencyGraphRequest) (*domain.DependencyGraphResponse, error) {
-	startTime := time.Now()
 	var warnings []string
 	var errors []string
 
@@ -118,9 +117,6 @@ func (s *DependencyGraphServiceImpl) Analyze(ctx context.Context, req domain.Dep
 
 	// Build analysis result
 	analysis := s.buildAnalysisResult(graph, circularDeps, couplingAnalysis, moduleMetrics, maxDepth)
-
-	duration := time.Since(startTime).Milliseconds()
-	_ = duration // Could be added to response if needed
 
 	return &domain.DependencyGraphResponse{
 		Graph:       graph,
