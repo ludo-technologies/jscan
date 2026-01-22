@@ -25,9 +25,18 @@ It provides complexity analysis, dead code detection, and more.`,
 	// Add subcommands
 	rootCmd.AddCommand(analyzeCmd())
 	rootCmd.AddCommand(depsCmd())
+	rootCmd.AddCommand(checkCmd())
 	rootCmd.AddCommand(versionCmd())
 
 	if err := rootCmd.Execute(); err != nil {
+		// Handle custom exit codes from check command
+		if exitErr, ok := err.(*CheckExitError); ok {
+			if exitErr.Message != "" {
+				fmt.Fprintf(os.Stderr, "Error: %s\n", exitErr.Message)
+			}
+			// Silently exit with the specified code (output already printed)
+			os.Exit(exitErr.Code)
+		}
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
 	}
