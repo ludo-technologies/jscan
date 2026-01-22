@@ -79,7 +79,7 @@ Examples:
 	return cmd
 }
 
-func runDeps(cmd *cobra.Command, args []string) error {
+func runDeps(cmd *cobra.Command, args []string) (err error) {
 	if len(args) == 0 {
 		return fmt.Errorf("no paths specified")
 	}
@@ -146,11 +146,15 @@ func runDeps(cmd *cobra.Command, args []string) error {
 	// Determine output writer
 	var writer *os.File
 	if depsOutputPath != "" {
-		f, err := os.Create(depsOutputPath)
-		if err != nil {
-			return fmt.Errorf("failed to create output file: %w", err)
+		f, createErr := os.Create(depsOutputPath)
+		if createErr != nil {
+			return fmt.Errorf("failed to create output file: %w", createErr)
 		}
-		defer f.Close()
+		defer func() {
+			if closeErr := f.Close(); closeErr != nil && err == nil {
+				err = fmt.Errorf("failed to close output file: %w", closeErr)
+			}
+		}()
 		writer = f
 	} else {
 		writer = os.Stdout

@@ -53,7 +53,8 @@ func NewDOTFormatter(config *DOTFormatterConfig) *DOTFormatter {
 	return &DOTFormatter{config: config}
 }
 
-// Node styling colors by risk level
+// nodeColors defines the color scheme for nodes based on risk level.
+// This is effectively a constant map and should not be modified at runtime.
 var nodeColors = map[domain.RiskLevel]struct {
 	fill   string
 	border string
@@ -63,7 +64,8 @@ var nodeColors = map[domain.RiskLevel]struct {
 	domain.RiskLevelHigh:   {fill: "#FF6B6B", border: "#DC143C"},
 }
 
-// Edge styling by type
+// edgeStyles defines the visual style for edges based on dependency type.
+// This is effectively a constant map and should not be modified at runtime.
 var edgeStyles = map[domain.DependencyEdgeType]struct {
 	style string
 	arrow string
@@ -254,7 +256,9 @@ func (f *DOTFormatter) filterNodes(graph *domain.DependencyGraph, analysis *doma
 	return result
 }
 
-// filterByDepth filters nodes by maximum dependency depth from entry points
+// filterByDepth filters nodes by maximum dependency depth from entry points.
+// The analysis parameter is currently unused but reserved for future enhancements
+// such as using pre-computed depth information from the analysis result.
 func (f *DOTFormatter) filterByDepth(graph *domain.DependencyGraph, _ *domain.DependencyAnalysisResult, nodes map[string]bool) map[string]bool {
 	result := make(map[string]bool)
 

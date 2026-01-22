@@ -577,6 +577,171 @@ func TestShortenModuleName(t *testing.T) {
 	}
 }
 
+func TestDOTFormatterMaxDepthFilter(t *testing.T) {
+	// Create a graph with depth: entry -> level1 -> level2 -> level3
+	graph := domain.NewDependencyGraph()
+
+	graph.AddNode(&domain.ModuleNode{
+		ID:           "entry.ts",
+		Name:         "entry",
+		IsEntryPoint: true,
+	})
+	graph.AddNode(&domain.ModuleNode{
+		ID:   "level1.ts",
+		Name: "level1",
+	})
+	graph.AddNode(&domain.ModuleNode{
+		ID:   "level2.ts",
+		Name: "level2",
+	})
+	graph.AddNode(&domain.ModuleNode{
+		ID:   "level3.ts",
+		Name: "level3",
+	})
+
+	graph.AddEdge(&domain.DependencyEdge{
+		From:     "entry.ts",
+		To:       "level1.ts",
+		EdgeType: domain.EdgeTypeImport,
+	})
+	graph.AddEdge(&domain.DependencyEdge{
+		From:     "level1.ts",
+		To:       "level2.ts",
+		EdgeType: domain.EdgeTypeImport,
+	})
+	graph.AddEdge(&domain.DependencyEdge{
+		From:     "level2.ts",
+		To:       "level3.ts",
+		EdgeType: domain.EdgeTypeImport,
+	})
+
+	response := &domain.DependencyGraphResponse{
+		Graph:    graph,
+		Analysis: &domain.DependencyAnalysisResult{},
+	}
+
+	t.Run("MaxDepth=1 shows entry and level1 only", func(t *testing.T) {
+		config := DefaultDOTFormatterConfig()
+		config.MaxDepth = 1
+		config.ShowLegend = false
+		formatter := NewDOTFormatter(config)
+
+		result, err := formatter.FormatDependencyGraph(response)
+		if err != nil {
+			t.Fatalf("FormatDependencyGraph failed: %v", err)
+		}
+
+		// entry.ts (depth 0) should be included
+		if !strings.Contains(result, "entry_ts") {
+			t.Error("entry.ts should be included (depth=0)")
+		}
+		// level1.ts (depth 1) should be included
+		if !strings.Contains(result, "level1_ts") {
+			t.Error("level1.ts should be included (depth=1)")
+		}
+		// level2.ts (depth 2) should be excluded
+		if strings.Contains(result, "level2_ts") {
+			t.Error("level2.ts should be excluded (depth=2)")
+		}
+		// level3.ts (depth 3) should be excluded
+		if strings.Contains(result, "level3_ts") {
+			t.Error("level3.ts should be excluded (depth=3)")
+		}
+	})
+
+	t.Run("MaxDepth=2 shows up to level2", func(t *testing.T) {
+		config := DefaultDOTFormatterConfig()
+		config.MaxDepth = 2
+		config.ShowLegend = false
+		formatter := NewDOTFormatter(config)
+
+		result, err := formatter.FormatDependencyGraph(response)
+		if err != nil {
+			t.Fatalf("FormatDependencyGraph failed: %v", err)
+		}
+
+		if !strings.Contains(result, "entry_ts") {
+			t.Error("entry.ts should be included")
+		}
+		if !strings.Contains(result, "level1_ts") {
+			t.Error("level1.ts should be included")
+		}
+		if !strings.Contains(result, "level2_ts") {
+			t.Error("level2.ts should be included (depth=2)")
+		}
+		if strings.Contains(result, "level3_ts") {
+			t.Error("level3.ts should be excluded (depth=3)")
+		}
+	})
+
+	t.Run("MaxDepth=0 (unlimited) shows all nodes", func(t *testing.T) {
+		config := DefaultDOTFormatterConfig()
+		config.MaxDepth = 0
+		config.ShowLegend = false
+		formatter := NewDOTFormatter(config)
+
+		result, err := formatter.FormatDependencyGraph(response)
+		if err != nil {
+			t.Fatalf("FormatDependencyGraph failed: %v", err)
+		}
+
+		if !strings.Contains(result, "entry_ts") {
+			t.Error("entry.ts should be included")
+		}
+		if !strings.Contains(result, "level1_ts") {
+			t.Error("level1.ts should be included")
+		}
+		if !strings.Contains(result, "level2_ts") {
+			t.Error("level2.ts should be included")
+		}
+		if !strings.Contains(result, "level3_ts") {
+			t.Error("level3.ts should be included")
+		}
+	})
+}
+
+func TestDOTFormatterMaxDepthNoEntryPoints(t *testing.T) {
+	// Test behavior when MaxDepth is set but there are no entry points
+	graph := domain.NewDependencyGraph()
+
+	graph.AddNode(&domain.ModuleNode{
+		ID:           "a.ts",
+		Name:         "a",
+		IsEntryPoint: false, // Not an entry point
+	})
+	graph.AddNode(&domain.ModuleNode{
+		ID:   "b.ts",
+		Name: "b",
+	})
+
+	graph.AddEdge(&domain.DependencyEdge{
+		From:     "a.ts",
+		To:       "b.ts",
+		EdgeType: domain.EdgeTypeImport,
+	})
+
+	response := &domain.DependencyGraphResponse{
+		Graph:    graph,
+		Analysis: &domain.DependencyAnalysisResult{},
+	}
+
+	config := DefaultDOTFormatterConfig()
+	config.MaxDepth = 1
+	config.ShowLegend = false
+	formatter := NewDOTFormatter(config)
+
+	result, err := formatter.FormatDependencyGraph(response)
+	if err != nil {
+		t.Fatalf("FormatDependencyGraph failed: %v", err)
+	}
+
+	// With no entry points, BFS won't find any nodes
+	// Should produce empty graph message
+	if !strings.Contains(result, "No modules match the filter criteria") {
+		t.Error("Expected empty graph when MaxDepth is set but no entry points exist")
+	}
+}
+
 func TestDOTFormatterEmptyGraph(t *testing.T) {
 	graph := domain.NewDependencyGraph()
 	// Add only external nodes which will be filtered out
