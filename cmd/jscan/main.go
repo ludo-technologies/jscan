@@ -26,6 +26,7 @@ It provides complexity analysis, dead code detection, and more.`,
 	rootCmd.AddCommand(analyzeCmd())
 	rootCmd.AddCommand(depsCmd())
 	rootCmd.AddCommand(checkCmd())
+	rootCmd.AddCommand(initCmd())
 	rootCmd.AddCommand(versionCmd())
 
 	if err := rootCmd.Execute(); err != nil {
