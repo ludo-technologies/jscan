@@ -10,13 +10,6 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var (
-	initConfigPath  string
-	initForce       bool
-	initMinimal     bool
-	initInteractive bool
-)
-
 func initCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "init",
@@ -45,40 +38,48 @@ Examples:
 		RunE: runInit,
 	}
 
-	cmd.Flags().StringVarP(&initConfigPath, "config", "c", "jscan.config.json",
+	cmd.Flags().StringP("config", "c", "jscan.config.json",
 		"Output path for the config file")
-	cmd.Flags().BoolVarP(&initForce, "force", "f", false,
+	cmd.Flags().BoolP("force", "f", false,
 		"Overwrite existing config file")
-	cmd.Flags().BoolVar(&initMinimal, "minimal", false,
+	cmd.Flags().Bool("minimal", false,
 		"Generate minimal config with essential options only")
-	cmd.Flags().BoolVarP(&initInteractive, "interactive", "i", false,
+	cmd.Flags().BoolP("interactive", "i", false,
 		"Interactive setup wizard")
 
 	return cmd
 }
 
 func runInit(cmd *cobra.Command, args []string) error {
+	// Get flag values from command
+	configPath, _ := cmd.Flags().GetString("config")
+	force, _ := cmd.Flags().GetBool("force")
+	minimal, _ := cmd.Flags().GetBool("minimal")
+	interactive, _ := cmd.Flags().GetBool("interactive")
+
 	var projectType config.ProjectType = config.ProjectTypeGeneric
 	var strictness config.Strictness = config.StrictnessStandard
 
 	// Run interactive setup if requested
-	if initInteractive {
+	if interactive {
 		var err error
-		projectType, strictness, err = runInteractiveSetup()
+		var interactiveConfigPath string
+		projectType, strictness, interactiveConfigPath, err = runInteractiveSetup(configPath)
 		if err != nil {
 			return err
 		}
+		configPath = interactiveConfigPath
 	}
 
 	// Check if file exists
-	if !initForce {
-		if _, err := os.Stat(initConfigPath); err == nil {
-			return fmt.Errorf("%s already exists. Use --force to overwrite", initConfigPath)
+	if !force {
+		if _, err := os.Stat(configPath); err == nil {
+			return fmt.Errorf("%s already exists. Use --force to overwrite", configPath)
 		}
 	}
 
 	// Check if parent directory exists
-	dir := filepath.Dir(initConfigPath)
+	dir := filepath.Dir(configPath)
 	if dir != "." && dir != "" {
 		if _, err := os.Stat(dir); os.IsNotExist(err) {
 			return fmt.Errorf("directory does not exist: %s", dir)
@@ -87,26 +88,29 @@ func runInit(cmd *cobra.Command, args []string) error {
 
 	// Generate config content
 	var content string
-	if initMinimal {
+	if minimal {
 		content = config.GetMinimalConfigTemplate()
 	} else {
 		content = config.GetFullConfigTemplate(projectType, strictness)
 	}
 
 	// Write to file
-	if err := os.WriteFile(initConfigPath, []byte(content), 0644); err != nil {
+	if err := os.WriteFile(configPath, []byte(content), 0644); err != nil {
 		return fmt.Errorf("failed to write config file: %w", err)
 	}
 
-	// Print success message
-	absPath, _ := filepath.Abs(initConfigPath)
-	fmt.Printf("Created %s\n", absPath)
+	// Print success message with absolute path if possible, otherwise use relative path
+	displayPath := configPath
+	if absPath, err := filepath.Abs(configPath); err == nil {
+		displayPath = absPath
+	}
+	fmt.Printf("Created %s\n", displayPath)
 	fmt.Println("\nRun 'jscan analyze .' to analyze your project.")
 
 	return nil
 }
 
-func runInteractiveSetup() (config.ProjectType, config.Strictness, error) {
+func runInteractiveSetup(defaultConfigPath string) (config.ProjectType, config.Strictness, string, error) {
 	fmt.Println()
 	fmt.Println("jscan Configuration Setup")
 	fmt.Println("=========================")
@@ -138,7 +142,7 @@ func runInteractiveSetup() (config.ProjectType, config.Strictness, error) {
 
 	projectIdx, _, err := projectPrompt.Run()
 	if err != nil {
-		return "", "", fmt.Errorf("project selection cancelled: %w", err)
+		return "", "", "", fmt.Errorf("project selection cancelled: %w", err)
 	}
 	selectedProject := projectTypes[projectIdx].Value
 
@@ -170,7 +174,7 @@ func runInteractiveSetup() (config.ProjectType, config.Strictness, error) {
 
 	strictnessIdx, _, err := strictnessPrompt.Run()
 	if err != nil {
-		return "", "", fmt.Errorf("strictness selection cancelled: %w", err)
+		return "", "", "", fmt.Errorf("strictness selection cancelled: %w", err)
 	}
 	selectedStrictness := strictnessLevels[strictnessIdx].Value
 
@@ -179,21 +183,21 @@ func runInteractiveSetup() (config.ProjectType, config.Strictness, error) {
 	// Output path prompt
 	outputPrompt := promptui.Prompt{
 		Label:   "Output file path",
-		Default: initConfigPath,
+		Default: defaultConfigPath,
 	}
 
 	outputPath, err := outputPrompt.Run()
 	if err != nil {
-		return "", "", fmt.Errorf("output path input cancelled: %w", err)
+		return "", "", "", fmt.Errorf("output path input cancelled: %w", err)
 	}
 
-	// Update the config path with user input
-	if outputPath != "" {
-		initConfigPath = outputPath
+	// Use default if empty
+	if outputPath == "" {
+		outputPath = defaultConfigPath
 	}
 
 	fmt.Println()
-	fmt.Printf("Creating %s... ", initConfigPath)
+	fmt.Printf("Creating %s... ", outputPath)
 
-	return selectedProject, selectedStrictness, nil
+	return selectedProject, selectedStrictness, outputPath, nil
 }

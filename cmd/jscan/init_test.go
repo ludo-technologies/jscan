@@ -9,17 +9,7 @@ import (
 	"github.com/ludo-technologies/jscan/internal/config"
 )
 
-// resetInitFlags resets all init command flags to their defaults
-func resetInitFlags() {
-	initConfigPath = "jscan.config.json"
-	initForce = false
-	initMinimal = false
-	initInteractive = false
-}
-
 func TestInitCommand_BasicConfigCreation(t *testing.T) {
-	resetInitFlags()
-
 	// Create temp directory
 	tmpDir, err := os.MkdirTemp("", "jscan-init-test")
 	if err != nil {
@@ -29,10 +19,11 @@ func TestInitCommand_BasicConfigCreation(t *testing.T) {
 
 	// Set up the config path
 	configPath := filepath.Join(tmpDir, "jscan.config.json")
-	initConfigPath = configPath
 
-	// Run the init command directly
-	err = runInit(nil, nil)
+	// Run the init command with args
+	cmd := initCmd()
+	cmd.SetArgs([]string{"--config", configPath})
+	err = cmd.Execute()
 	if err != nil {
 		t.Fatalf("init command failed: %v", err)
 	}
@@ -67,8 +58,6 @@ func TestInitCommand_BasicConfigCreation(t *testing.T) {
 }
 
 func TestInitCommand_ForceOverwrite(t *testing.T) {
-	resetInitFlags()
-
 	// Create temp directory
 	tmpDir, err := os.MkdirTemp("", "jscan-init-test")
 	if err != nil {
@@ -85,10 +74,9 @@ func TestInitCommand_ForceOverwrite(t *testing.T) {
 	}
 
 	// Try to create without force - should fail
-	initConfigPath = configPath
-	initForce = false
-
-	err = runInit(nil, nil)
+	cmd := initCmd()
+	cmd.SetArgs([]string{"--config", configPath})
+	err = cmd.Execute()
 	if err == nil {
 		t.Fatal("Expected error when file exists without --force")
 	}
@@ -98,8 +86,9 @@ func TestInitCommand_ForceOverwrite(t *testing.T) {
 	}
 
 	// Now try with force - should succeed
-	initForce = true
-	err = runInit(nil, nil)
+	cmd = initCmd()
+	cmd.SetArgs([]string{"--config", configPath, "--force"})
+	err = cmd.Execute()
 	if err != nil {
 		t.Fatalf("init --force failed: %v", err)
 	}
@@ -116,8 +105,6 @@ func TestInitCommand_ForceOverwrite(t *testing.T) {
 }
 
 func TestInitCommand_MinimalConfig(t *testing.T) {
-	resetInitFlags()
-
 	// Create temp directory
 	tmpDir, err := os.MkdirTemp("", "jscan-init-test")
 	if err != nil {
@@ -126,10 +113,10 @@ func TestInitCommand_MinimalConfig(t *testing.T) {
 	defer os.RemoveAll(tmpDir)
 
 	configPath := filepath.Join(tmpDir, "jscan.config.json")
-	initConfigPath = configPath
-	initMinimal = true
 
-	err = runInit(nil, nil)
+	cmd := initCmd()
+	cmd.SetArgs([]string{"--config", configPath, "--minimal"})
+	err = cmd.Execute()
 	if err != nil {
 		t.Fatalf("init --minimal failed: %v", err)
 	}
@@ -158,8 +145,6 @@ func TestInitCommand_MinimalConfig(t *testing.T) {
 }
 
 func TestInitCommand_CustomOutputPath(t *testing.T) {
-	resetInitFlags()
-
 	// Create temp directory
 	tmpDir, err := os.MkdirTemp("", "jscan-init-test")
 	if err != nil {
@@ -169,9 +154,10 @@ func TestInitCommand_CustomOutputPath(t *testing.T) {
 
 	// Test custom filename
 	customPath := filepath.Join(tmpDir, "custom-config.json")
-	initConfigPath = customPath
 
-	err = runInit(nil, nil)
+	cmd := initCmd()
+	cmd.SetArgs([]string{"--config", customPath})
+	err = cmd.Execute()
 	if err != nil {
 		t.Fatalf("init with custom path failed: %v", err)
 	}
@@ -183,12 +169,10 @@ func TestInitCommand_CustomOutputPath(t *testing.T) {
 }
 
 func TestInitCommand_InvalidDirectory(t *testing.T) {
-	resetInitFlags()
-
 	// Try to create config in non-existent directory
-	initConfigPath = "/nonexistent/directory/jscan.config.json"
-
-	err := runInit(nil, nil)
+	cmd := initCmd()
+	cmd.SetArgs([]string{"--config", "/nonexistent/directory/jscan.config.json"})
+	err := cmd.Execute()
 	if err == nil {
 		t.Fatal("Expected error when directory doesn't exist")
 	}
@@ -199,8 +183,6 @@ func TestInitCommand_InvalidDirectory(t *testing.T) {
 }
 
 func TestInitCommand_FullConfigSize(t *testing.T) {
-	resetInitFlags()
-
 	// Create temp directory
 	tmpDir, err := os.MkdirTemp("", "jscan-init-test")
 	if err != nil {
@@ -210,10 +192,9 @@ func TestInitCommand_FullConfigSize(t *testing.T) {
 
 	// Create full config
 	fullPath := filepath.Join(tmpDir, "full.json")
-	initConfigPath = fullPath
-	initMinimal = false
-
-	err = runInit(nil, nil)
+	cmd := initCmd()
+	cmd.SetArgs([]string{"--config", fullPath})
+	err = cmd.Execute()
 	if err != nil {
 		t.Fatalf("init failed: %v", err)
 	}
@@ -222,10 +203,9 @@ func TestInitCommand_FullConfigSize(t *testing.T) {
 
 	// Create minimal config
 	minimalPath := filepath.Join(tmpDir, "minimal.json")
-	initConfigPath = minimalPath
-	initMinimal = true
-
-	err = runInit(nil, nil)
+	cmd = initCmd()
+	cmd.SetArgs([]string{"--config", minimalPath, "--minimal"})
+	err = cmd.Execute()
 	if err != nil {
 		t.Fatalf("init --minimal failed: %v", err)
 	}
@@ -520,5 +500,19 @@ func TestInitCmd_FlagsExist(t *testing.T) {
 		if flag == nil {
 			t.Errorf("Missing short flag -%s for --%s", short, long)
 		}
+	}
+}
+
+func TestInitCmd_DefaultConfigPath(t *testing.T) {
+	cmd := initCmd()
+
+	// Verify default config path
+	configFlag := cmd.Flags().Lookup("config")
+	if configFlag == nil {
+		t.Fatal("config flag not found")
+	}
+
+	if configFlag.DefValue != "jscan.config.json" {
+		t.Errorf("Expected default config path to be 'jscan.config.json', got '%s'", configFlag.DefValue)
 	}
 }

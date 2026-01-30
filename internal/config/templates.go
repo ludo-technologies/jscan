@@ -1,12 +1,14 @@
 package config
 
+import "strconv"
+
 // ProjectType represents the type of JavaScript/TypeScript project
 type ProjectType string
 
 const (
-	ProjectTypeGeneric    ProjectType = "generic"
-	ProjectTypeReact      ProjectType = "react"
-	ProjectTypeVue        ProjectType = "vue"
+	ProjectTypeGeneric     ProjectType = "generic"
+	ProjectTypeReact       ProjectType = "react"
+	ProjectTypeVue         ProjectType = "vue"
 	ProjectTypeNodeBackend ProjectType = "node"
 )
 
@@ -153,16 +155,16 @@ func GetFullConfigTemplate(projectType ProjectType, strictness Strictness) strin
 
     // Threshold for LOW risk (recommended: 10)
     // Functions with complexity <= this value are considered easy to maintain
-    "lowThreshold": ` + itoa(strict.LowThreshold) + `,
+    "lowThreshold": ` + strconv.Itoa(strict.LowThreshold) + `,
 
     // Threshold for MEDIUM risk
     // Functions above lowThreshold but <= this value need attention
     // Functions above this are considered HIGH risk
-    "mediumThreshold": ` + itoa(strict.MediumThreshold) + `,
+    "mediumThreshold": ` + strconv.Itoa(strict.MediumThreshold) + `,
 
     // Maximum allowed complexity (0 = no limit)
     // Set this for CI/CD enforcement to fail builds on complex functions
-    "maxComplexity": ` + itoa(strict.MaxComplexity) + `,
+    "maxComplexity": ` + strconv.Itoa(strict.MaxComplexity) + `,
 
     // Report functions with complexity = 1 (simple functions)
     "reportUnchanged": false
@@ -263,28 +265,4 @@ func formatJSONArray(items []string) string {
 	}
 	result += "    ]"
 	return result
-}
-
-// itoa converts int to string (avoiding strconv import for simple case)
-func itoa(i int) string {
-	if i == 0 {
-		return "0"
-	}
-
-	negative := i < 0
-	if negative {
-		i = -i
-	}
-
-	var digits []byte
-	for i > 0 {
-		digits = append([]byte{byte('0' + i%10)}, digits...)
-		i /= 10
-	}
-
-	if negative {
-		digits = append([]byte{'-'}, digits...)
-	}
-
-	return string(digits)
 }
