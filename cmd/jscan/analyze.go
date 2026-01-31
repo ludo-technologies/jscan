@@ -99,6 +99,10 @@ func runAnalyze(cmd *cobra.Command, args []string) error {
 		fmt.Printf("Analyzing %d files...\n", len(files))
 	}
 
+	// Create progress manager (auto-disabled for JSON output or non-TTY)
+	pm := service.NewProgressManager(format != domain.OutputFormatJSON)
+	defer pm.Close()
+
 	// Start timing
 	startTime := time.Now()
 
@@ -108,7 +112,7 @@ func runAnalyze(cmd *cobra.Command, args []string) error {
 
 	// Run complexity analysis if selected
 	if contains(selectAnalyses, "complexity") {
-		resp, err := runComplexityAnalysis(files, cfg)
+		resp, err := runComplexityAnalysis(files, cfg, pm)
 		if err != nil {
 			if format != domain.OutputFormatJSON {
 				fmt.Fprintf(os.Stderr, "Complexity analysis error: %v\n", err)
@@ -120,7 +124,7 @@ func runAnalyze(cmd *cobra.Command, args []string) error {
 
 	// Run dead code analysis if selected
 	if contains(selectAnalyses, "deadcode") {
-		resp, err := runDeadCodeAnalysis(files, cfg)
+		resp, err := runDeadCodeAnalysis(files, cfg, pm)
 		if err != nil {
 			if format != domain.OutputFormatJSON {
 				fmt.Fprintf(os.Stderr, "Dead code analysis error: %v\n", err)
@@ -175,8 +179,8 @@ func runAnalyze(cmd *cobra.Command, args []string) error {
 }
 
 // runComplexityAnalysis runs complexity analysis on the given files
-func runComplexityAnalysis(files []string, cfg *config.Config) (*domain.ComplexityResponse, error) {
-	svc := service.NewComplexityService(&cfg.Complexity)
+func runComplexityAnalysis(files []string, cfg *config.Config, pm domain.ProgressManager) (*domain.ComplexityResponse, error) {
+	svc := service.NewComplexityServiceWithProgress(&cfg.Complexity, pm)
 
 	req := domain.ComplexityRequest{
 		Paths:           files,
@@ -190,10 +194,17 @@ func runComplexityAnalysis(files []string, cfg *config.Config) (*domain.Complexi
 }
 
 // runDeadCodeAnalysis runs dead code analysis on the given files
-func runDeadCodeAnalysis(files []string, cfg *config.Config) (*domain.DeadCodeResponse, error) {
+func runDeadCodeAnalysis(files []string, _ *config.Config, pm domain.ProgressManager) (*domain.DeadCodeResponse, error) {
 	var allFiles []domain.FileDeadCode
 	var totalFindings, criticalFindings, warningFindings, infoFindings int
 	var totalFunctions, functionsWithDeadCode int
+
+	// Set up progress tracking
+	var task domain.TaskProgress
+	if pm != nil {
+		task = pm.StartTask("Detecting dead code", len(files))
+		defer task.Complete()
+	}
 
 	for _, filePath := range files {
 		// Read file
@@ -273,6 +284,10 @@ func runDeadCodeAnalysis(files []string, cfg *config.Config) (*domain.DeadCodeRe
 				TotalFindings: len(functions),
 			}
 			allFiles = append(allFiles, fileDeadCode)
+		}
+
+		if task != nil {
+			task.Increment(1)
 		}
 	}
 

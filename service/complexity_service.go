@@ -16,7 +16,8 @@ import (
 
 // ComplexityServiceImpl implements the ComplexityService interface
 type ComplexityServiceImpl struct {
-	config *config.ComplexityConfig
+	config   *config.ComplexityConfig
+	progress domain.ProgressManager
 }
 
 // NewComplexityService creates a new complexity service implementation
@@ -26,12 +27,27 @@ func NewComplexityService(cfg *config.ComplexityConfig) *ComplexityServiceImpl {
 	}
 }
 
+// NewComplexityServiceWithProgress creates a new complexity service with progress reporting
+func NewComplexityServiceWithProgress(cfg *config.ComplexityConfig, pm domain.ProgressManager) *ComplexityServiceImpl {
+	return &ComplexityServiceImpl{
+		config:   cfg,
+		progress: pm,
+	}
+}
+
 // Analyze performs complexity analysis on multiple files
 func (s *ComplexityServiceImpl) Analyze(ctx context.Context, req domain.ComplexityRequest) (*domain.ComplexityResponse, error) {
 	var allFunctions []domain.FunctionComplexity
 	var warnings []string
 	var errors []string
 	filesProcessed := 0
+
+	// Set up progress tracking
+	var task domain.TaskProgress
+	if s.progress != nil {
+		task = s.progress.StartTask("Analyzing complexity", len(req.Paths))
+		defer task.Complete()
+	}
 
 	for _, filePath := range req.Paths {
 		// Check context cancellation
@@ -46,12 +62,19 @@ func (s *ComplexityServiceImpl) Analyze(ctx context.Context, req domain.Complexi
 
 		if len(fileErrors) > 0 {
 			errors = append(errors, fileErrors...)
+			if task != nil {
+				task.Increment(1)
+			}
 			continue // Skip this file but continue with others
 		}
 
 		allFunctions = append(allFunctions, functions...)
 		warnings = append(warnings, fileWarnings...)
 		filesProcessed++
+
+		if task != nil {
+			task.Increment(1)
+		}
 	}
 
 	if len(allFunctions) == 0 {

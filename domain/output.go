@@ -22,26 +22,22 @@ type ReportWriter interface {
 
 // ProgressManager manages progress tracking for analysis
 type ProgressManager interface {
-	// Initialize sets up progress tracking with the maximum value
-	Initialize(maxValue int)
-
-	// Start starts the progress bar
-	Start()
-
-	// Complete marks the progress as completed
-	Complete(success bool)
-
-	// Update updates the progress
-	Update(processed, total int)
-
-	// SetWriter sets the output writer for progress bars
-	SetWriter(writer io.Writer)
-
+	// StartTask creates a new progress task with a description and total count
+	StartTask(description string, total int) TaskProgress
 	// IsInteractive returns true if progress bars should be shown
 	IsInteractive() bool
-
-	// Close cleans up any resources
+	// Close cleans up all tasks
 	Close()
+}
+
+// TaskProgress tracks progress for a single analysis task
+type TaskProgress interface {
+	// Increment adds n to the current progress
+	Increment(n int)
+	// Describe updates the current item description
+	Describe(description string)
+	// Complete marks the task as finished
+	Complete()
 }
 
 // ParallelExecutor manages parallel execution of tasks

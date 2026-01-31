@@ -26,14 +26,14 @@ func (e *CheckExitError) Error() string {
 }
 
 var (
-	checkMaxComplexity   int
-	checkAllowDeadCode   bool
-	checkSkipClones      bool
-	checkAllowCircDeps   bool
-	checkMaxCycles       int
-	checkSelectAnalyses  []string
-	checkVerbose         bool
-	checkJSON            bool
+	checkMaxComplexity  int
+	checkAllowDeadCode  bool
+	checkSkipClones     bool
+	checkAllowCircDeps  bool
+	checkMaxCycles      int
+	checkSelectAnalyses []string
+	checkVerbose        bool
+	checkJSON           bool
 )
 
 func checkCmd() *cobra.Command {
@@ -112,6 +112,10 @@ func runCheck(cmd *cobra.Command, args []string) error {
 		return &CheckExitError{Code: 2, Message: "no JavaScript/TypeScript files found"}
 	}
 
+	// Create progress manager (auto-disabled for JSON output or non-TTY/CI)
+	pm := service.NewProgressManager(!checkJSON)
+	defer pm.Close()
+
 	// Initialize result
 	result := &domain.CheckResult{
 		Passed:     true,
@@ -126,13 +130,13 @@ func runCheck(cmd *cobra.Command, args []string) error {
 
 	// Run selected analyses
 	if contains(checkSelectAnalyses, "complexity") {
-		if err := checkComplexity(ctx, files, cfg, result); err != nil {
+		if err := checkComplexity(ctx, files, cfg, result, pm); err != nil {
 			return &CheckExitError{Code: 2, Message: err.Error()}
 		}
 	}
 
 	if contains(checkSelectAnalyses, "deadcode") {
-		if err := checkDeadCode(ctx, files, cfg, result); err != nil {
+		if err := checkDeadCode(ctx, files, cfg, result, pm); err != nil {
 			return &CheckExitError{Code: 2, Message: err.Error()}
 		}
 	}
@@ -146,10 +150,10 @@ func runCheck(cmd *cobra.Command, args []string) error {
 	return outputCheckResult(result, startTime)
 }
 
-func checkComplexity(ctx context.Context, files []string, cfg *config.Config, result *domain.CheckResult) error {
+func checkComplexity(ctx context.Context, files []string, cfg *config.Config, result *domain.CheckResult, pm domain.ProgressManager) error {
 	result.Summary.ComplexityChecked = true
 
-	svc := service.NewComplexityService(&cfg.Complexity)
+	svc := service.NewComplexityServiceWithProgress(&cfg.Complexity, pm)
 	req := domain.ComplexityRequest{
 		Paths:           files,
 		LowThreshold:    cfg.Complexity.LowThreshold,
@@ -182,10 +186,10 @@ func checkComplexity(ctx context.Context, files []string, cfg *config.Config, re
 	return nil
 }
 
-func checkDeadCode(_ context.Context, files []string, cfg *config.Config, result *domain.CheckResult) error {
+func checkDeadCode(_ context.Context, files []string, cfg *config.Config, result *domain.CheckResult, pm domain.ProgressManager) error {
 	result.Summary.DeadCodeChecked = true
 
-	resp, err := runDeadCodeAnalysis(files, cfg)
+	resp, err := runDeadCodeAnalysis(files, cfg, pm)
 	if err != nil {
 		return fmt.Errorf("dead code analysis failed: %w", err)
 	}
