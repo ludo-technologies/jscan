@@ -47,7 +47,9 @@ func (h *FileHelper) CollectJSFiles(paths []string, recursive bool, includePatte
 							return filepath.SkipDir
 						}
 						// Check for directory name with glob pattern
-						if matched, _ := filepath.Match(pattern, dirName); matched {
+						// Note: filepath.Match errors are ignored (invalid patterns simply don't match)
+						// This is intentional to allow the program to continue with valid patterns
+						if matched, err := filepath.Match(pattern, dirName); err == nil && matched {
 							return filepath.SkipDir
 						}
 					}
@@ -115,11 +117,14 @@ func (h *FileHelper) isJSFile(path string) bool {
 
 // isExcluded checks if a path matches any exclude pattern
 func (h *FileHelper) isExcluded(path string, excludePatterns []string) bool {
+	baseName := filepath.Base(path)
 	for _, pattern := range excludePatterns {
-		if matched, _ := filepath.Match(pattern, filepath.Base(path)); matched {
+		// Check glob pattern against base name
+		// Note: filepath.Match errors are ignored (invalid patterns simply don't match)
+		if matched, err := filepath.Match(pattern, baseName); err == nil && matched {
 			return true
 		}
-		// Also check full path matching
+		// Also check if pattern appears in the full path (for directory matching)
 		if strings.Contains(path, pattern) {
 			return true
 		}

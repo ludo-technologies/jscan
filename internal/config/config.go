@@ -256,16 +256,31 @@ func DefaultConfig() *Config {
 				"**/*.mjs", "**/*.cjs", "**/*.mts", "**/*.cts",
 			},
 			ExcludePatterns: []string{
+				// Package managers and dependencies
 				"node_modules",
+				"vendor",
+				// Build outputs
 				"dist",
 				"build",
+				"out",
+				".output",
+				// Framework-specific
 				".next",
 				".nuxt",
+				".vercel",
+				// Cache directories
+				".cache",
+				".turbo",
 				"coverage",
-				"vendor",
+				// Version control
 				".git",
+				// Minified and bundled files
 				"*.min.js",
+				"*.min.mjs",
+				"*.min.cjs",
 				"*.bundle.js",
+				// Source maps
+				"*.map",
 			},
 			Recursive:      true,
 			FollowSymlinks: false,

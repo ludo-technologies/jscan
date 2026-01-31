@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 	"sync"
 	"time"
 
+	"github.com/ludo-technologies/jscan/app"
 	"github.com/ludo-technologies/jscan/domain"
 	"github.com/ludo-technologies/jscan/internal/analyzer"
 	"github.com/ludo-technologies/jscan/internal/config"
@@ -357,64 +357,10 @@ func runDeadCodeAnalysisWithTask(files []string, task domain.TaskProgress) (*dom
 	return response, nil
 }
 
+// collectJSFiles collects JavaScript/TypeScript files from a path using FileHelper
 func collectJSFiles(path string, excludePatterns []string) ([]string, error) {
-	var files []string
-
-	info, err := os.Stat(path)
-	if err != nil {
-		return nil, err
-	}
-
-	if !info.IsDir() {
-		if isJSFile(path) {
-			return []string{path}, nil
-		}
-		return nil, nil
-	}
-
-	err = filepath.Walk(path, func(filePath string, info os.FileInfo, err error) error {
-		if err != nil {
-			return err
-		}
-
-		// Skip excluded directories early
-		if info.IsDir() {
-			dirName := filepath.Base(filePath)
-			for _, pattern := range excludePatterns {
-				// Check for exact directory name match
-				if pattern == dirName {
-					return filepath.SkipDir
-				}
-				// Check for directory name with glob pattern
-				if matched, _ := filepath.Match(pattern, dirName); matched {
-					return filepath.SkipDir
-				}
-			}
-			return nil
-		}
-
-		// Check file exclusion patterns
-		fileName := filepath.Base(filePath)
-		for _, pattern := range excludePatterns {
-			if matched, _ := filepath.Match(pattern, fileName); matched {
-				return nil
-			}
-		}
-
-		if isJSFile(filePath) {
-			files = append(files, filePath)
-		}
-
-		return nil
-	})
-
-	return files, err
-}
-
-func isJSFile(path string) bool {
-	ext := strings.ToLower(filepath.Ext(path))
-	return ext == ".js" || ext == ".ts" || ext == ".jsx" || ext == ".tsx" ||
-		ext == ".mjs" || ext == ".cjs" || ext == ".mts" || ext == ".cts"
+	helper := app.NewFileHelper()
+	return helper.CollectJSFiles([]string{path}, true, nil, excludePatterns)
 }
 
 func contains(slice []string, item string) bool {
