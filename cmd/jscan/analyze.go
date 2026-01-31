@@ -24,6 +24,7 @@ var (
 	configPath     string
 	jsonOutput     bool
 	htmlOutput     bool
+	textOutput     bool
 	noOpenBrowser  bool
 	outputPath     string
 )
@@ -34,26 +35,31 @@ func analyzeCmd() *cobra.Command {
 		Short: "Analyze JavaScript/TypeScript files",
 		Long: `Analyze JavaScript/TypeScript files for complexity, dead code, and other issues.
 
+By default, generates an HTML report and opens it in your browser.
+
 Examples:
-  jscan analyze src/
-  jscan analyze --select complexity src/
-  jscan analyze --select complexity,deadcode --json src/
-  jscan analyze --format json src/`,
+  jscan analyze src/                    # Generate HTML report (default)
+  jscan analyze --json src/             # Output JSON to stdout
+  jscan analyze --text src/             # Output text to stdout
+  jscan analyze --no-open src/          # Generate HTML without opening browser
+  jscan analyze -o report.html src/     # Custom output path`,
 		RunE: runAnalyze,
 	}
 
 	cmd.Flags().StringSliceVarP(&selectAnalyses, "select", "s", []string{"complexity", "deadcode"},
 		"Analyses to run (comma-separated): complexity,deadcode")
-	cmd.Flags().StringVarP(&outputFormat, "format", "f", "text",
-		"Output format: text, json, html")
+	cmd.Flags().StringVarP(&outputFormat, "format", "f", "html",
+		"Output format: html, json, text (default: html)")
 	cmd.Flags().BoolVar(&jsonOutput, "json", false,
-		"Output results as JSON (shorthand for --format json)")
+		"Output results as JSON to stdout")
+	cmd.Flags().BoolVar(&textOutput, "text", false,
+		"Output results as text to stdout")
 	cmd.Flags().BoolVar(&htmlOutput, "html", false,
-		"Output results as HTML (shorthand for --format html)")
+		"Output results as HTML report (default)")
 	cmd.Flags().BoolVar(&noOpenBrowser, "no-open", false,
 		"Don't auto-open HTML report in browser")
 	cmd.Flags().StringVarP(&outputPath, "output", "o", "",
-		"Output file path (default: jscan-report.html for HTML)")
+		"Output file path (default: jscan-report.html)")
 	cmd.Flags().StringVarP(&configPath, "config", "c", "",
 		"Path to config file")
 
@@ -65,12 +71,12 @@ func runAnalyze(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("no paths specified")
 	}
 
-	// Determine output format
-	format := domain.OutputFormatText
+	// Determine output format (default: HTML)
+	format := domain.OutputFormatHTML
 	if jsonOutput || outputFormat == "json" {
 		format = domain.OutputFormatJSON
-	} else if htmlOutput || outputFormat == "html" {
-		format = domain.OutputFormatHTML
+	} else if textOutput || outputFormat == "text" {
+		format = domain.OutputFormatText
 	}
 
 	// Load configuration
