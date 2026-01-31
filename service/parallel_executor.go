@@ -15,8 +15,11 @@ import (
 
 // Default values for parallel executor
 const (
-	DefaultMaxConcurrency = 4              // Default to 4 concurrent tasks
-	DefaultTimeout        = 5 * time.Minute // Default 5 minute timeout
+	// DefaultMaxConcurrency is used when config value is invalid.
+	// NewParallelExecutor() uses runtime.NumCPU() for optimal CPU utilization,
+	// while NewParallelExecutorFromConfig() falls back to this constant.
+	DefaultMaxConcurrency = 4
+	DefaultTimeout        = 5 * time.Minute
 )
 
 // TaskError represents a single task failure
@@ -171,11 +174,10 @@ func (e *ParallelExecutorImpl) Execute(ctx context.Context, tasks []domain.Execu
 		})
 	}
 
-	// Wait for all tasks to complete
-	if err := g.Wait(); err != nil {
-		// This handles context cancellation from errgroup
-		return e.wrapContextError(ctx, timeoutCtx, err)
-	}
+	// Wait for all tasks to complete.
+	// Note: g.Wait() always returns nil here because goroutines return nil
+	// to allow all tasks to complete. Errors are collected in taskErrors.
+	_ = g.Wait()
 
 	// Return aggregated error if any tasks failed
 	if len(taskErrors) > 0 {
@@ -212,15 +214,4 @@ func (e *ParallelExecutorImpl) filterEnabledTasks(tasks []domain.ExecutableTask)
 		}
 	}
 	return enabled
-}
-
-// wrapContextError wraps context errors with appropriate domain errors
-func (e *ParallelExecutorImpl) wrapContextError(parentCtx, timeoutCtx context.Context, err error) error {
-	if timeoutCtx.Err() == context.DeadlineExceeded {
-		return domain.NewDomainError("TIMEOUT_ERROR", "execution timed out", err)
-	}
-	if parentCtx.Err() == context.Canceled {
-		return domain.NewDomainError("CANCELLED_ERROR", "execution cancelled", err)
-	}
-	return err
 }

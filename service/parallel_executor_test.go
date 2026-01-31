@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"errors"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -203,17 +204,15 @@ func TestParallelExecutor_PartialFailures(t *testing.T) {
 }
 
 func TestParallelExecutor_Timeout(t *testing.T) {
-	cfg := &config.PerformanceConfig{
-		MaxGoroutines:  4,
-		TimeoutSeconds: 1, // 1 second timeout
-	}
-	executor := NewParallelExecutorFromConfig(cfg)
+	// Use short timeout for faster, more stable CI tests
+	executor := NewParallelExecutor()
+	executor.SetTimeout(100 * time.Millisecond)
 	ctx := context.Background()
 
 	tasks := []domain.ExecutableTask{
 		newMockTaskWithExec("slow-task", true, func(ctx context.Context) (interface{}, error) {
 			select {
-			case <-time.After(5 * time.Second): // Task takes longer than timeout
+			case <-time.After(500 * time.Millisecond): // Task takes longer than timeout
 				return "done", nil
 			case <-ctx.Done():
 				return nil, ctx.Err()
@@ -490,7 +489,7 @@ func TestAggregatedError_Error(t *testing.T) {
 			if len(errStr) == 0 {
 				t.Error("error string should not be empty")
 			}
-			if !containsSubstring(errStr, tt.contains) {
+			if !strings.Contains(errStr, tt.contains) {
 				t.Errorf("error string should contain %q, got %q", tt.contains, errStr)
 			}
 		})
@@ -588,18 +587,4 @@ func (m *mockTaskProgress) Complete() {
 	if m.completeFunc != nil {
 		m.completeFunc()
 	}
-}
-
-func containsSubstring(s, substr string) bool {
-	return len(s) >= len(substr) && (s == substr || len(substr) == 0 ||
-		(len(s) > 0 && len(substr) > 0 && findSubstring(s, substr)))
-}
-
-func findSubstring(s, substr string) bool {
-	for i := 0; i <= len(s)-len(substr); i++ {
-		if s[i:i+len(substr)] == substr {
-			return true
-		}
-	}
-	return false
 }
