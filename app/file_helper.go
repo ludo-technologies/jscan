@@ -38,7 +38,23 @@ func (h *FileHelper) CollectJSFiles(paths []string, recursive bool, includePatte
 					return err
 				}
 
-				if !info.IsDir() && h.isJSFile(filePath) && !h.isExcluded(filePath, excludePatterns) {
+				// Skip excluded directories early
+				if info.IsDir() {
+					dirName := filepath.Base(filePath)
+					for _, pattern := range excludePatterns {
+						// Check for exact directory name match
+						if pattern == dirName {
+							return filepath.SkipDir
+						}
+						// Check for directory name with glob pattern
+						if matched, _ := filepath.Match(pattern, dirName); matched {
+							return filepath.SkipDir
+						}
+					}
+					return nil
+				}
+
+				if h.isJSFile(filePath) && !h.isExcluded(filePath, excludePatterns) {
 					files = append(files, filePath)
 				}
 

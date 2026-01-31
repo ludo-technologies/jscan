@@ -251,10 +251,24 @@ func DefaultConfig() *Config {
 			MinComplexity: DefaultMinComplexityFilter,
 		},
 		Analysis: AnalysisConfig{
-			IncludePatterns: []string{"**/*.py"},
-			ExcludePatterns: []string{"test_*.py", "*_test.py"},
-			Recursive:       true,
-			FollowSymlinks:  false,
+			IncludePatterns: []string{
+				"**/*.js", "**/*.ts", "**/*.jsx", "**/*.tsx",
+				"**/*.mjs", "**/*.cjs", "**/*.mts", "**/*.cts",
+			},
+			ExcludePatterns: []string{
+				"node_modules",
+				"dist",
+				"build",
+				".next",
+				".nuxt",
+				"coverage",
+				"vendor",
+				".git",
+				"*.min.js",
+				"*.bundle.js",
+			},
+			Recursive:      true,
+			FollowSymlinks: false,
 		},
 	}
 

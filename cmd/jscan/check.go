@@ -98,10 +98,10 @@ func runCheck(cmd *cobra.Command, args []string) error {
 	// Load default configuration
 	cfg := config.DefaultConfig()
 
-	// Collect JavaScript/TypeScript files
+	// Collect JavaScript/TypeScript files (using exclude patterns from config)
 	var files []string
 	for _, path := range args {
-		pathFiles, err := collectJSFiles(path)
+		pathFiles, err := collectJSFiles(path, cfg.Analysis.ExcludePatterns)
 		if err != nil {
 			return &CheckExitError{Code: 2, Message: fmt.Sprintf("failed to collect files from %s: %v", path, err)}
 		}

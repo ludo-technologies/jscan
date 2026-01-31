@@ -88,10 +88,10 @@ func runAnalyze(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	// Collect JavaScript/TypeScript files
+	// Collect JavaScript/TypeScript files (using exclude patterns from config)
 	var files []string
 	for _, path := range args {
-		pathFiles, err := collectJSFiles(path)
+		pathFiles, err := collectJSFiles(path, cfg.Analysis.ExcludePatterns)
 		if err != nil {
 			return fmt.Errorf("failed to collect files from %s: %w", path, err)
 		}
@@ -357,7 +357,7 @@ func runDeadCodeAnalysisWithTask(files []string, task domain.TaskProgress) (*dom
 	return response, nil
 }
 
-func collectJSFiles(path string) ([]string, error) {
+func collectJSFiles(path string, excludePatterns []string) ([]string, error) {
 	var files []string
 
 	info, err := os.Stat(path)
@@ -377,7 +377,31 @@ func collectJSFiles(path string) ([]string, error) {
 			return err
 		}
 
-		if !info.IsDir() && isJSFile(filePath) {
+		// Skip excluded directories early
+		if info.IsDir() {
+			dirName := filepath.Base(filePath)
+			for _, pattern := range excludePatterns {
+				// Check for exact directory name match
+				if pattern == dirName {
+					return filepath.SkipDir
+				}
+				// Check for directory name with glob pattern
+				if matched, _ := filepath.Match(pattern, dirName); matched {
+					return filepath.SkipDir
+				}
+			}
+			return nil
+		}
+
+		// Check file exclusion patterns
+		fileName := filepath.Base(filePath)
+		for _, pattern := range excludePatterns {
+			if matched, _ := filepath.Match(pattern, fileName); matched {
+				return nil
+			}
+		}
+
+		if isJSFile(filePath) {
 			files = append(files, filePath)
 		}
 
