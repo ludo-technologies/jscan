@@ -171,3 +171,176 @@ func TestDefaultUseCaseOptions(t *testing.T) {
 		t.Errorf("Expected MaxConcurrency to be 4, got %d", opts.MaxConcurrency)
 	}
 }
+
+func TestFileHelperExcludeNodeModules(t *testing.T) {
+	// Create temp directory structure with node_modules
+	tempDir := t.TempDir()
+
+	// Create a source file
+	srcDir := filepath.Join(tempDir, "src")
+	if err := os.MkdirAll(srcDir, 0755); err != nil {
+		t.Fatalf("Failed to create src dir: %v", err)
+	}
+	srcFile := filepath.Join(srcDir, "index.js")
+	if err := os.WriteFile(srcFile, []byte("// source"), 0644); err != nil {
+		t.Fatalf("Failed to create source file: %v", err)
+	}
+
+	// Create node_modules directory with a JS file
+	nodeModulesDir := filepath.Join(tempDir, "node_modules", "some-package")
+	if err := os.MkdirAll(nodeModulesDir, 0755); err != nil {
+		t.Fatalf("Failed to create node_modules dir: %v", err)
+	}
+	nodeModulesFile := filepath.Join(nodeModulesDir, "index.js")
+	if err := os.WriteFile(nodeModulesFile, []byte("// package"), 0644); err != nil {
+		t.Fatalf("Failed to create node_modules file: %v", err)
+	}
+
+	helper := NewFileHelper()
+
+	// Test with node_modules excluded
+	excludePatterns := []string{"node_modules"}
+	files, err := helper.CollectJSFiles([]string{tempDir}, true, nil, excludePatterns)
+	if err != nil {
+		t.Fatalf("CollectJSFiles failed: %v", err)
+	}
+
+	// Should only find 1 file (src/index.js), not the one in node_modules
+	if len(files) != 1 {
+		t.Errorf("Expected 1 file (excluding node_modules), got %d", len(files))
+	}
+
+	// Verify the found file is from src, not node_modules
+	for _, f := range files {
+		if filepath.Base(filepath.Dir(f)) == "node_modules" || filepath.Base(filepath.Dir(filepath.Dir(f))) == "node_modules" {
+			t.Errorf("Found file in node_modules which should be excluded: %s", f)
+		}
+	}
+}
+
+func TestFileHelperExcludeMultiplePatterns(t *testing.T) {
+	// Create temp directory structure
+	tempDir := t.TempDir()
+
+	// Create various directories
+	dirs := []string{"src", "dist", "build", ".next", "coverage"}
+	for _, dir := range dirs {
+		dirPath := filepath.Join(tempDir, dir)
+		if err := os.MkdirAll(dirPath, 0755); err != nil {
+			t.Fatalf("Failed to create %s dir: %v", dir, err)
+		}
+		file := filepath.Join(dirPath, "index.js")
+		if err := os.WriteFile(file, []byte("// "+dir), 0644); err != nil {
+			t.Fatalf("Failed to create file in %s: %v", dir, err)
+		}
+	}
+
+	helper := NewFileHelper()
+
+	// Test with multiple exclusions
+	excludePatterns := []string{"dist", "build", ".next", "coverage"}
+	files, err := helper.CollectJSFiles([]string{tempDir}, true, nil, excludePatterns)
+	if err != nil {
+		t.Fatalf("CollectJSFiles failed: %v", err)
+	}
+
+	// Should only find 1 file (src/index.js)
+	if len(files) != 1 {
+		t.Errorf("Expected 1 file (only src), got %d", len(files))
+	}
+}
+
+func TestFileHelperExcludeMinifiedFiles(t *testing.T) {
+	// Create temp directory
+	tempDir := t.TempDir()
+
+	// Create various files
+	testFiles := []string{"app.js", "utils.js", "vendor.min.js", "bundle.bundle.js"}
+	for _, f := range testFiles {
+		path := filepath.Join(tempDir, f)
+		if err := os.WriteFile(path, []byte("// "+f), 0644); err != nil {
+			t.Fatalf("Failed to create test file: %v", err)
+		}
+	}
+
+	helper := NewFileHelper()
+
+	// Test with minified file exclusions
+	excludePatterns := []string{"*.min.js", "*.bundle.js"}
+	files, err := helper.CollectJSFiles([]string{tempDir}, true, nil, excludePatterns)
+	if err != nil {
+		t.Fatalf("CollectJSFiles failed: %v", err)
+	}
+
+	// Should find only app.js and utils.js
+	if len(files) != 2 {
+		t.Errorf("Expected 2 files (excluding minified/bundled), got %d", len(files))
+	}
+}
+
+func TestFileHelperExcludeSourceMaps(t *testing.T) {
+	// Create temp directory
+	tempDir := t.TempDir()
+
+	// Create various files including source maps
+	testFiles := []string{
+		"app.js",
+		"app.js.map",      // Source map
+		"utils.min.js",    // Minified
+		"utils.min.js.map", // Minified source map
+		"lib.mjs",
+		"lib.min.mjs",     // Minified ESM
+	}
+	for _, f := range testFiles {
+		path := filepath.Join(tempDir, f)
+		if err := os.WriteFile(path, []byte("// "+f), 0644); err != nil {
+			t.Fatalf("Failed to create test file: %v", err)
+		}
+	}
+
+	helper := NewFileHelper()
+
+	// Test with source map and minified exclusions
+	excludePatterns := []string{"*.map", "*.min.js", "*.min.mjs"}
+	files, err := helper.CollectJSFiles([]string{tempDir}, true, nil, excludePatterns)
+	if err != nil {
+		t.Fatalf("CollectJSFiles failed: %v", err)
+	}
+
+	// Should find only app.js and lib.mjs
+	if len(files) != 2 {
+		t.Errorf("Expected 2 files (excluding maps/minified), got %d: %v", len(files), files)
+	}
+}
+
+func TestFileHelperExcludeCacheDirectories(t *testing.T) {
+	// Create temp directory structure with cache directories
+	tempDir := t.TempDir()
+
+	// Create various directories including cache dirs
+	dirs := []string{"src", ".cache", ".turbo", ".vercel", ".output"}
+	for _, dir := range dirs {
+		dirPath := filepath.Join(tempDir, dir)
+		if err := os.MkdirAll(dirPath, 0755); err != nil {
+			t.Fatalf("Failed to create %s dir: %v", dir, err)
+		}
+		file := filepath.Join(dirPath, "index.js")
+		if err := os.WriteFile(file, []byte("// "+dir), 0644); err != nil {
+			t.Fatalf("Failed to create file in %s: %v", dir, err)
+		}
+	}
+
+	helper := NewFileHelper()
+
+	// Test with cache directory exclusions
+	excludePatterns := []string{".cache", ".turbo", ".vercel", ".output"}
+	files, err := helper.CollectJSFiles([]string{tempDir}, true, nil, excludePatterns)
+	if err != nil {
+		t.Fatalf("CollectJSFiles failed: %v", err)
+	}
+
+	// Should only find 1 file (src/index.js)
+	if len(files) != 1 {
+		t.Errorf("Expected 1 file (only src), got %d", len(files))
+	}
+}

@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/ludo-technologies/jscan/domain"
+	"github.com/ludo-technologies/jscan/internal/config"
 	"github.com/ludo-technologies/jscan/service"
 	"github.com/spf13/cobra"
 )
@@ -94,10 +95,13 @@ func runDeps(cmd *cobra.Command, args []string) (err error) {
 		format = domain.OutputFormatText
 	}
 
-	// Collect JavaScript/TypeScript files
+	// Load default configuration
+	cfg := config.DefaultConfig()
+
+	// Collect JavaScript/TypeScript files (using exclude patterns from config)
 	var files []string
 	for _, path := range args {
-		pathFiles, err := collectJSFiles(path)
+		pathFiles, err := collectJSFiles(path, cfg.Analysis.ExcludePatterns)
 		if err != nil {
 			return fmt.Errorf("failed to collect files from %s: %w", path, err)
 		}

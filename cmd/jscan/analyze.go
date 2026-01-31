@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 	"sync"
 	"time"
 
+	"github.com/ludo-technologies/jscan/app"
 	"github.com/ludo-technologies/jscan/domain"
 	"github.com/ludo-technologies/jscan/internal/analyzer"
 	"github.com/ludo-technologies/jscan/internal/config"
@@ -88,10 +88,10 @@ func runAnalyze(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	// Collect JavaScript/TypeScript files
+	// Collect JavaScript/TypeScript files (using exclude patterns from config)
 	var files []string
 	for _, path := range args {
-		pathFiles, err := collectJSFiles(path)
+		pathFiles, err := collectJSFiles(path, cfg.Analysis.ExcludePatterns)
 		if err != nil {
 			return fmt.Errorf("failed to collect files from %s: %w", path, err)
 		}
@@ -357,40 +357,10 @@ func runDeadCodeAnalysisWithTask(files []string, task domain.TaskProgress) (*dom
 	return response, nil
 }
 
-func collectJSFiles(path string) ([]string, error) {
-	var files []string
-
-	info, err := os.Stat(path)
-	if err != nil {
-		return nil, err
-	}
-
-	if !info.IsDir() {
-		if isJSFile(path) {
-			return []string{path}, nil
-		}
-		return nil, nil
-	}
-
-	err = filepath.Walk(path, func(filePath string, info os.FileInfo, err error) error {
-		if err != nil {
-			return err
-		}
-
-		if !info.IsDir() && isJSFile(filePath) {
-			files = append(files, filePath)
-		}
-
-		return nil
-	})
-
-	return files, err
-}
-
-func isJSFile(path string) bool {
-	ext := strings.ToLower(filepath.Ext(path))
-	return ext == ".js" || ext == ".ts" || ext == ".jsx" || ext == ".tsx" ||
-		ext == ".mjs" || ext == ".cjs" || ext == ".mts" || ext == ".cts"
+// collectJSFiles collects JavaScript/TypeScript files from a path using FileHelper
+func collectJSFiles(path string, excludePatterns []string) ([]string, error) {
+	helper := app.NewFileHelper()
+	return helper.CollectJSFiles([]string{path}, true, nil, excludePatterns)
 }
 
 func contains(slice []string, item string) bool {
