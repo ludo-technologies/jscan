@@ -115,10 +115,14 @@ func runAnalyze(cmd *cobra.Command, args []string) error {
 	runComplexity := contains(selectAnalyses, "complexity")
 	runDeadCode := contains(selectAnalyses, "deadcode")
 
-	// Single progress bar for all analyses
-	task := pm.StartTask("Analyzing", 100)
-	estimatedDuration := estimateAnalysisDuration(len(files), runComplexity, runDeadCode)
-	progressDone := startTimeBasedProgressUpdater(task, estimatedDuration)
+	// Single progress bar for all analyses (only when interactive)
+	var task domain.TaskProgress
+	var progressDone chan struct{}
+	if pm.IsInteractive() {
+		task = pm.StartTask("Analyzing", 100)
+		estimatedDuration := estimateAnalysisDuration(len(files), runComplexity, runDeadCode)
+		progressDone = startTimeBasedProgressUpdater(task, estimatedDuration)
+	}
 
 	// Run analyses in parallel
 	var wg sync.WaitGroup
@@ -141,7 +145,7 @@ func runAnalyze(cmd *cobra.Command, args []string) error {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			resp, err := runDeadCodeAnalysisInternal(files, cfg)
+			resp, err := runDeadCodeAnalysisInternal(files)
 			mu.Lock()
 			deadCodeResponse = resp
 			deadCodeErr = err
@@ -150,8 +154,12 @@ func runAnalyze(cmd *cobra.Command, args []string) error {
 	}
 
 	wg.Wait()
-	close(progressDone)
-	task.Complete()
+	if progressDone != nil {
+		close(progressDone)
+	}
+	if task != nil {
+		task.Complete()
+	}
 
 	// Handle errors
 	if complexityErr != nil && format != domain.OutputFormatJSON {
@@ -222,20 +230,20 @@ func runComplexityAnalysisInternal(files []string, cfg *config.Config) (*domain.
 
 // runDeadCodeAnalysis runs dead code analysis on the given files with progress tracking
 // This is used by check.go which has its own progress management
-func runDeadCodeAnalysis(files []string, cfg *config.Config, pm domain.ProgressManager) (*domain.DeadCodeResponse, error) {
+func runDeadCodeAnalysis(files []string, _ *config.Config, pm domain.ProgressManager) (*domain.DeadCodeResponse, error) {
 	task := pm.StartTask("Detecting dead code", len(files))
 	defer task.Complete()
 
-	return runDeadCodeAnalysisWithTask(files, cfg, task)
+	return runDeadCodeAnalysisWithTask(files, task)
 }
 
 // runDeadCodeAnalysisInternal runs dead code analysis on the given files without progress tracking
-func runDeadCodeAnalysisInternal(files []string, cfg *config.Config) (*domain.DeadCodeResponse, error) {
-	return runDeadCodeAnalysisWithTask(files, cfg, nil)
+func runDeadCodeAnalysisInternal(files []string) (*domain.DeadCodeResponse, error) {
+	return runDeadCodeAnalysisWithTask(files, nil)
 }
 
 // runDeadCodeAnalysisWithTask runs dead code analysis with optional task progress
-func runDeadCodeAnalysisWithTask(files []string, _ *config.Config, task domain.TaskProgress) (*domain.DeadCodeResponse, error) {
+func runDeadCodeAnalysisWithTask(files []string, task domain.TaskProgress) (*domain.DeadCodeResponse, error) {
 	var allFiles []domain.FileDeadCode
 	var totalFindings, criticalFindings, warningFindings, infoFindings int
 	var totalFunctions, functionsWithDeadCode int
@@ -388,18 +396,12 @@ func contains(slice []string, item string) bool {
 	return false
 }
 
-// estimateAnalysisDuration estimates total analysis time based on file count
-func estimateAnalysisDuration(fileCount int, runComplexity, runDeadCode bool) time.Duration {
+// estimateAnalysisDuration estimates total analysis time based on file count.
+// Since analyses run in parallel, the time is based on the slower analysis (not the sum).
+func estimateAnalysisDuration(fileCount int, _, _ bool) time.Duration {
 	perFileMs := 10.0
-	analysisCount := 0
-	if runComplexity {
-		analysisCount++
-	}
-	if runDeadCode {
-		analysisCount++
-	}
 
-	estimatedMs := float64(fileCount) * perFileMs * float64(analysisCount)
+	estimatedMs := float64(fileCount) * perFileMs
 	if estimatedMs < 100 {
 		estimatedMs = 100
 	}
