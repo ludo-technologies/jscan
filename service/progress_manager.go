@@ -3,6 +3,7 @@ package service
 import (
 	"io"
 	"os"
+	"sync"
 
 	"github.com/ludo-technologies/jscan/domain"
 	"github.com/schollz/progressbar/v3"
@@ -12,6 +13,7 @@ import (
 type ProgressManagerImpl struct {
 	writer io.Writer
 	tasks  []*progressbar.ProgressBar
+	mu     sync.Mutex
 }
 
 // NewProgressManager creates a new progress manager based on environment
@@ -43,7 +45,11 @@ func (pm *ProgressManagerImpl) StartTask(description string, total int) domain.T
 		progressbar.OptionShowCount(),
 		progressbar.OptionSetPredictTime(true),
 	)
+
+	pm.mu.Lock()
 	pm.tasks = append(pm.tasks, bar)
+	pm.mu.Unlock()
+
 	return &TaskProgressImpl{bar: bar}
 }
 
@@ -54,6 +60,9 @@ func (pm *ProgressManagerImpl) IsInteractive() bool {
 
 // Close cleans up all tasks
 func (pm *ProgressManagerImpl) Close() {
+	pm.mu.Lock()
+	defer pm.mu.Unlock()
+
 	for _, bar := range pm.tasks {
 		_ = bar.Finish()
 	}

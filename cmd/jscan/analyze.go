@@ -200,11 +200,8 @@ func runDeadCodeAnalysis(files []string, _ *config.Config, pm domain.ProgressMan
 	var totalFunctions, functionsWithDeadCode int
 
 	// Set up progress tracking
-	var task domain.TaskProgress
-	if pm != nil {
-		task = pm.StartTask("Detecting dead code", len(files))
-		defer task.Complete()
-	}
+	task := pm.StartTask("Detecting dead code", len(files))
+	defer task.Complete()
 
 	for _, filePath := range files {
 		// Read file
@@ -286,9 +283,7 @@ func runDeadCodeAnalysis(files []string, _ *config.Config, pm domain.ProgressMan
 			allFiles = append(allFiles, fileDeadCode)
 		}
 
-		if task != nil {
-			task.Increment(1)
-		}
+		task.Increment(1)
 	}
 
 	response := &domain.DeadCodeResponse{

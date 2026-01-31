@@ -42,12 +42,12 @@ func (s *ComplexityServiceImpl) Analyze(ctx context.Context, req domain.Complexi
 	var errors []string
 	filesProcessed := 0
 
-	// Set up progress tracking
-	var task domain.TaskProgress
+	// Set up progress tracking (use no-op if progress manager not set)
+	var task domain.TaskProgress = &NoOpTaskProgress{}
 	if s.progress != nil {
 		task = s.progress.StartTask("Analyzing complexity", len(req.Paths))
-		defer task.Complete()
 	}
+	defer task.Complete()
 
 	for _, filePath := range req.Paths {
 		// Check context cancellation
@@ -62,19 +62,14 @@ func (s *ComplexityServiceImpl) Analyze(ctx context.Context, req domain.Complexi
 
 		if len(fileErrors) > 0 {
 			errors = append(errors, fileErrors...)
-			if task != nil {
-				task.Increment(1)
-			}
+			task.Increment(1)
 			continue // Skip this file but continue with others
 		}
 
 		allFunctions = append(allFunctions, functions...)
 		warnings = append(warnings, fileWarnings...)
 		filesProcessed++
-
-		if task != nil {
-			task.Increment(1)
-		}
+		task.Increment(1)
 	}
 
 	if len(allFunctions) == 0 {
