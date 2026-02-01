@@ -1,0 +1,43 @@
+{
+  "name": "jscan",
+  "version": "0.0.0",
+  "description": "Code quality analyzer for JavaScript/TypeScript projects",
+  "keywords": [
+    "javascript",
+    "typescript",
+    "code-quality",
+    "static-analysis",
+    "linter",
+    "analyzer",
+    "complexity",
+    "dead-code"
+  ],
+  "homepage": "https://github.com/ludo-technologies/jscan",
+  "bugs": {
+    "url": "https://github.com/ludo-technologies/jscan/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ludo-technologies/jscan.git"
+  },
+  "license": "MIT",
+  "author": "Ludo Technologies",
+  "bin": {
+    "jscan": "./bin/jscan"
+  },
+  "scripts": {
+    "postinstall": "node scripts/download-binary.js"
+  },
+  "engines": {
+    "node": ">=14"
+  },
+  "os": [
+    "darwin",
+    "linux",
+    "win32"
+  ],
+  "cpu": [
+    "x64",
+    "arm64"
+  ]
+}
