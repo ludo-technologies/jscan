@@ -9,15 +9,30 @@ permissions:
   contents: write
 
 jobs:
-  goreleaser:
-    runs-on: ubuntu-latest
-    outputs:
-      version: ${{ steps.get_version.outputs.version }}
+  build:
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            goos: linux
+            goarch: amd64
+          - os: ubuntu-24.04-arm
+            goos: linux
+            goarch: arm64
+          - os: macos-13
+            goos: darwin
+            goarch: amd64
+          - os: macos-latest
+            goos: darwin
+            goarch: arm64
+          - os: windows-latest
+            goos: windows
+            goarch: amd64
+
+    runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
       - name: Set up Go
         uses: actions/setup-go@v5
@@ -26,18 +41,66 @@ jobs:
 
       - name: Get version
         id: get_version
+        shell: bash
         run: echo "version=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
 
-      - name: Run GoReleaser
-        uses: goreleaser/goreleaser-action@v6
+      - name: Build
+        shell: bash
+        run: |
+          VERSION=${{ steps.get_version.outputs.version }}
+          EXT=""
+          if [ "${{ matrix.goos }}" = "windows" ]; then
+            EXT=".exe"
+          fi
+
+          go build -ldflags="-s -w -X main.version=${VERSION}" -o jscan${EXT} ./cmd/jscan
+
+          # Create archive
+          ARCHIVE_NAME="jscan_${VERSION}_${{ matrix.goos }}_${{ matrix.goarch }}"
+          if [ "${{ matrix.goos }}" = "windows" ]; then
+            7z a "${ARCHIVE_NAME}.zip" jscan${EXT}
+          else
+            tar -czvf "${ARCHIVE_NAME}.tar.gz" jscan${EXT}
+          fi
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
         with:
-          version: latest
-          args: release --clean
+          name: jscan-${{ matrix.goos }}-${{ matrix.goarch }}
+          path: jscan_*
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.get_version.outputs.version }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Get version
+        id: get_version
+        run: echo "version=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: List artifacts
+        run: ls -la dist/
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*
+          generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   npm-publish:
-    needs: goreleaser
+    needs: release
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -51,7 +114,7 @@ jobs:
 
       - name: Update package.json version
         working-directory: ./npm
-        run: npm version ${{ needs.goreleaser.outputs.version }} --no-git-tag-version
+        run: npm version ${{ needs.release.outputs.version }} --no-git-tag-version
 
       - name: Publish to npm
         working-directory: ./npm
