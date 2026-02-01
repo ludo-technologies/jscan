@@ -1,9 +1,12 @@
 package app
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/ludo-technologies/jscan/domain"
 )
 
 func TestFileHelperCollectJSFiles(t *testing.T) {
@@ -343,4 +346,148 @@ func TestFileHelperExcludeCacheDirectories(t *testing.T) {
 	if len(files) != 1 {
 		t.Errorf("Expected 1 file (only src), got %d", len(files))
 	}
+}
+
+// Use Case Tests
+
+func TestNewComplexityUseCaseBuilder(t *testing.T) {
+	builder := NewComplexityUseCaseBuilder()
+	if builder == nil {
+		t.Fatal("NewComplexityUseCaseBuilder should not return nil")
+	}
+}
+
+func TestComplexityUseCaseBuilder_BuildWithoutService(t *testing.T) {
+	builder := NewComplexityUseCaseBuilder()
+	_, err := builder.Build()
+
+	if err == nil {
+		t.Error("Build without service should return error")
+	}
+}
+
+func TestComplexityUseCaseBuilder_WithFileHelper(t *testing.T) {
+	// Create mock service
+	mockService := &mockComplexityService{}
+	fileHelper := NewFileHelper()
+
+	builder := NewComplexityUseCaseBuilder().
+		WithService(mockService).
+		WithFileHelper(fileHelper)
+
+	uc, err := builder.Build()
+	if err != nil {
+		t.Fatalf("Build should not return error: %v", err)
+	}
+	if uc == nil {
+		t.Fatal("UseCase should not be nil")
+	}
+}
+
+func TestNewDeadCodeUseCase(t *testing.T) {
+	uc := NewDeadCodeUseCase()
+	if uc == nil {
+		t.Fatal("NewDeadCodeUseCase should not return nil")
+	}
+}
+
+func TestNewDeadCodeUseCaseBuilder(t *testing.T) {
+	builder := NewDeadCodeUseCaseBuilder()
+	if builder == nil {
+		t.Fatal("NewDeadCodeUseCaseBuilder should not return nil")
+	}
+
+	uc, err := builder.Build()
+	if err != nil {
+		t.Fatalf("Build should not return error: %v", err)
+	}
+	if uc == nil {
+		t.Fatal("UseCase should not be nil")
+	}
+}
+
+func TestDeadCodeUseCaseBuilder_WithFileHelper(t *testing.T) {
+	fileHelper := NewFileHelper()
+
+	builder := NewDeadCodeUseCaseBuilder().
+		WithFileHelper(fileHelper)
+
+	uc, err := builder.Build()
+	if err != nil {
+		t.Fatalf("Build should not return error: %v", err)
+	}
+	if uc == nil {
+		t.Fatal("UseCase should not be nil")
+	}
+}
+
+func TestNewAnalyzeUseCaseBuilder(t *testing.T) {
+	builder := NewAnalyzeUseCaseBuilder()
+	if builder == nil {
+		t.Fatal("NewAnalyzeUseCaseBuilder should not return nil")
+	}
+
+	uc, err := builder.Build()
+	if err != nil {
+		t.Fatalf("Build should not return error: %v", err)
+	}
+	if uc == nil {
+		t.Fatal("UseCase should not be nil")
+	}
+}
+
+func TestAnalyzeUseCaseBuilder_WithDependencies(t *testing.T) {
+	mockService := &mockComplexityService{}
+	complexityUC := NewComplexityUseCase(mockService)
+	deadCodeUC := NewDeadCodeUseCase()
+	fileHelper := NewFileHelper()
+
+	builder := NewAnalyzeUseCaseBuilder().
+		WithComplexityUseCase(complexityUC).
+		WithDeadCodeUseCase(deadCodeUC).
+		WithFileHelper(fileHelper)
+
+	uc, err := builder.Build()
+	if err != nil {
+		t.Fatalf("Build should not return error: %v", err)
+	}
+	if uc == nil {
+		t.Fatal("UseCase should not be nil")
+	}
+}
+
+func TestAnalyzeResult_ToAnalyzeResponse(t *testing.T) {
+	result := &AnalyzeResult{
+		Complexity: nil,
+		DeadCode:   nil,
+		Summary: &domain.AnalyzeSummary{
+			TotalFiles: 10,
+		},
+	}
+
+	response := result.ToAnalyzeResponse()
+
+	if response == nil {
+		t.Fatal("Response should not be nil")
+	}
+	if response.Summary.TotalFiles != 10 {
+		t.Errorf("TotalFiles should be 10, got %d", response.Summary.TotalFiles)
+	}
+	if response.GeneratedAt.IsZero() {
+		t.Error("GeneratedAt should not be zero")
+	}
+}
+
+// Mock complexity service for testing
+type mockComplexityService struct{}
+
+func (m *mockComplexityService) Analyze(ctx context.Context, req domain.ComplexityRequest) (*domain.ComplexityResponse, error) {
+	return &domain.ComplexityResponse{
+		Functions: []domain.FunctionComplexity{},
+		Summary:   domain.ComplexitySummary{},
+	}, nil
+}
+
+func (m *mockComplexityService) AnalyzeFile(ctx context.Context, filePath string, req domain.ComplexityRequest) (*domain.ComplexityResponse, error) {
+	return m.Analyze(ctx, req)
 }
