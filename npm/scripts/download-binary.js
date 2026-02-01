@@ -37,8 +37,9 @@ const archiveName = `jscan_${version}_${platformName}_${archName}.tar.gz`;
 const downloadUrl = `https://github.com/ludo-technologies/jscan/releases/download/v${version}/${archiveName}`;
 
 const binDir = path.join(__dirname, "..", "bin");
+const tempDir = path.join(__dirname, "..", ".tmp");
 const binaryPath = path.join(binDir, binaryName);
-const archivePath = path.join(binDir, archiveName);
+const archivePath = path.join(tempDir, archiveName);
 
 // Skip download if binary already exists
 if (fs.existsSync(binaryPath)) {
@@ -46,9 +47,12 @@ if (fs.existsSync(binaryPath)) {
   process.exit(0);
 }
 
-// Create bin directory if it doesn't exist
+// Create directories if they don't exist
 if (!fs.existsSync(binDir)) {
   fs.mkdirSync(binDir, { recursive: true });
+}
+if (!fs.existsSync(tempDir)) {
+  fs.mkdirSync(tempDir, { recursive: true });
 }
 
 console.log(`Downloading jscan v${version} for ${platformName}-${archName}...`);
@@ -94,12 +98,12 @@ async function main() {
     await download(downloadUrl, archivePath);
     console.log("Download complete.");
 
-    // Extract the archive
+    // Extract the archive to temp directory
     console.log("Extracting...");
-    execSync(`tar -xzf "${archivePath}" -C "${binDir}"`, { stdio: "inherit" });
+    execSync(`tar -xzf "${archivePath}" -C "${tempDir}"`, { stdio: "inherit" });
 
-    // Rename the binary
-    const extractedBinary = path.join(binDir, `jscan${ext}`);
+    // Move binary to bin directory with platform-specific name
+    const extractedBinary = path.join(tempDir, `jscan${ext}`);
     if (fs.existsSync(extractedBinary)) {
       fs.renameSync(extractedBinary, binaryPath);
     }
@@ -109,8 +113,9 @@ async function main() {
       fs.chmodSync(binaryPath, 0o755);
     }
 
-    // Clean up archive
+    // Clean up
     fs.unlinkSync(archivePath);
+    fs.rmdirSync(tempDir);
 
     console.log(`jscan v${version} installed successfully!`);
   } catch (error) {
