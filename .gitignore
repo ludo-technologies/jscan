@@ -65,6 +65,9 @@ PLAN.md
 # Node modules (for testing JavaScript files)
 node_modules/
 
+# Test repositories
+test-repos/
+
 # JavaScript test artifacts
 *.bundle.js
 *.map
