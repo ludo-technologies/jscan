@@ -12,20 +12,29 @@ import (
 
 // HTMLData represents the data for HTML template
 type HTMLData struct {
-	GeneratedAt    string
-	Duration       int64
-	Version        string
-	Complexity     *domain.ComplexityResponse
-	DeadCode       *domain.DeadCodeResponse
-	Summary        *domain.AnalyzeSummary
-	HasComplexity  bool
-	HasDeadCode    bool
+	GeneratedAt   string
+	Duration      int64
+	Version       string
+	Complexity    *domain.ComplexityResponse
+	DeadCode      *domain.DeadCodeResponse
+	Clone         *domain.CloneResponse
+	CBO           *domain.CBOResponse
+	Deps          *domain.DependencyGraphResponse
+	Summary       *domain.AnalyzeSummary
+	HasComplexity bool
+	HasDeadCode   bool
+	HasClone      bool
+	HasCBO        bool
+	HasDeps       bool
 }
 
 // WriteHTML writes the analysis result as HTML
 func (f *OutputFormatterImpl) WriteHTML(
 	complexityResponse *domain.ComplexityResponse,
 	deadCodeResponse *domain.DeadCodeResponse,
+	cloneResponse *domain.CloneResponse,
+	cboResponse *domain.CBOResponse,
+	depsResponse *domain.DependencyGraphResponse,
 	writer io.Writer,
 	duration time.Duration,
 ) error {
@@ -53,6 +62,35 @@ func (f *OutputFormatterImpl) WriteHTML(
 		}
 	}
 
+	if cloneResponse != nil && cloneResponse.Statistics != nil {
+		summary.CloneEnabled = true
+		summary.TotalClones = cloneResponse.Statistics.TotalClones
+		summary.ClonePairs = cloneResponse.Statistics.TotalClonePairs
+		summary.CloneGroups = cloneResponse.Statistics.TotalCloneGroups
+		summary.CodeDuplication = calculateDuplicationPercentage(cloneResponse)
+	}
+
+	if cboResponse != nil {
+		summary.CBOEnabled = true
+		summary.CBOClasses = cboResponse.Summary.TotalClasses
+		summary.HighCouplingClasses = cboResponse.Summary.HighRiskClasses
+		summary.MediumCouplingClasses = cboResponse.Summary.MediumRiskClasses
+		summary.AverageCoupling = cboResponse.Summary.AverageCBO
+	}
+
+	if depsResponse != nil {
+		summary.DepsEnabled = true
+		if depsResponse.Graph != nil {
+			summary.DepsTotalModules = depsResponse.Graph.NodeCount()
+		}
+		if depsResponse.Analysis != nil {
+			if depsResponse.Analysis.CircularDependencies != nil {
+				summary.DepsModulesInCycles = depsResponse.Analysis.CircularDependencies.TotalModulesInCycles
+			}
+			summary.DepsMaxDepth = depsResponse.Analysis.MaxDepth
+		}
+	}
+
 	// Calculate health score
 	_ = summary.CalculateHealthScore()
 
@@ -62,9 +100,15 @@ func (f *OutputFormatterImpl) WriteHTML(
 		Version:       version.Version,
 		Complexity:    complexityResponse,
 		DeadCode:      deadCodeResponse,
+		Clone:         cloneResponse,
+		CBO:           cboResponse,
+		Deps:          depsResponse,
 		Summary:       summary,
 		HasComplexity: complexityResponse != nil,
 		HasDeadCode:   deadCodeResponse != nil,
+		HasClone:      cloneResponse != nil,
+		HasCBO:        cboResponse != nil,
+		HasDeps:       depsResponse != nil,
 	}
 
 	funcMap := template.FuncMap{
@@ -76,6 +120,9 @@ func (f *OutputFormatterImpl) WriteHTML(
 		},
 		"sub": func(a, b int) int {
 			return a - b
+		},
+		"mul": func(a, b float64) float64 {
+			return a * b
 		},
 		"scoreQuality": func(score int) string {
 			switch {
@@ -315,6 +362,15 @@ const htmlTemplate = `<!DOCTYPE html>
                 {{if .HasDeadCode}}
                 <button class="tab-button" onclick="showTab('deadcode', this)">Dead Code</button>
                 {{end}}
+                {{if .HasClone}}
+                <button class="tab-button" onclick="showTab('clone', this)">Clones</button>
+                {{end}}
+                {{if .HasCBO}}
+                <button class="tab-button" onclick="showTab('cbo', this)">Coupling</button>
+                {{end}}
+                {{if .HasDeps}}
+                <button class="tab-button" onclick="showTab('deps', this)">Dependencies</button>
+                {{end}}
             </div>
 
             <div id="summary" class="tab-content active">
@@ -345,6 +401,45 @@ const htmlTemplate = `<!DOCTYPE html>
                             <div class="score-bar-fill score-{{scoreQuality .Summary.DeadCodeScore}}" style="width: {{.Summary.DeadCodeScore}}%"></div>
                         </div>
                         <div class="score-detail">{{.Summary.DeadCodeCount}} issues, {{.Summary.CriticalDeadCode}} critical</div>
+                    </div>
+                    {{end}}
+
+                    {{if .HasClone}}
+                    <div class="score-bar-item">
+                        <div class="score-bar-header">
+                            <span class="score-label">Code Duplication</span>
+                            <span class="score-value">{{.Summary.DuplicationScore}}/100</span>
+                        </div>
+                        <div class="score-bar-container">
+                            <div class="score-bar-fill score-{{scoreQuality .Summary.DuplicationScore}}" style="width: {{.Summary.DuplicationScore}}%"></div>
+                        </div>
+                        <div class="score-detail">{{.Summary.ClonePairs}} clone pairs, {{printf "%.1f" .Summary.CodeDuplication}}% duplication</div>
+                    </div>
+                    {{end}}
+
+                    {{if .HasCBO}}
+                    <div class="score-bar-item">
+                        <div class="score-bar-header">
+                            <span class="score-label">Coupling</span>
+                            <span class="score-value">{{.Summary.CouplingScore}}/100</span>
+                        </div>
+                        <div class="score-bar-container">
+                            <div class="score-bar-fill score-{{scoreQuality .Summary.CouplingScore}}" style="width: {{.Summary.CouplingScore}}%"></div>
+                        </div>
+                        <div class="score-detail">{{.Summary.HighCouplingClasses}} high-risk classes, avg CBO: {{printf "%.1f" .Summary.AverageCoupling}}</div>
+                    </div>
+                    {{end}}
+
+                    {{if .HasDeps}}
+                    <div class="score-bar-item">
+                        <div class="score-bar-header">
+                            <span class="score-label">Dependencies</span>
+                            <span class="score-value">{{.Summary.DependencyScore}}/100</span>
+                        </div>
+                        <div class="score-bar-container">
+                            <div class="score-bar-fill score-{{scoreQuality .Summary.DependencyScore}}" style="width: {{.Summary.DependencyScore}}%"></div>
+                        </div>
+                        <div class="score-detail">{{.Summary.DepsTotalModules}} modules, {{.Summary.DepsModulesInCycles}} in cycles</div>
                     </div>
                     {{end}}
                 </div>
@@ -483,6 +578,193 @@ const htmlTemplate = `<!DOCTYPE html>
                 </table>
                 {{else}}
                 <p style="color: #4caf50; font-weight: bold; margin-top: 20px;">✓ No dead code detected</p>
+                {{end}}
+            </div>
+            {{end}}
+
+            {{if .HasClone}}
+            <div id="clone" class="tab-content">
+                <div class="tab-header-with-score">
+                    <h2 style="margin: 0;">Clone Detection</h2>
+                    <div class="score-badge-compact score-{{scoreQuality .Summary.DuplicationScore}}">
+                        {{.Summary.DuplicationScore}}/100
+                    </div>
+                </div>
+
+                <div class="metric-grid">
+                    <div class="metric-card">
+                        <div class="metric-value">{{.Clone.Statistics.TotalClonePairs}}</div>
+                        <div class="metric-label">Clone Pairs</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-value">{{.Clone.Statistics.TotalCloneGroups}}</div>
+                        <div class="metric-label">Clone Groups</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-value">{{printf "%.1f%%" .Summary.CodeDuplication}}</div>
+                        <div class="metric-label">Code Duplication</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-value">{{printf "%.0f%%" (mul .Clone.Statistics.AverageSimilarity 100)}}</div>
+                        <div class="metric-label">Avg Similarity</div>
+                    </div>
+                </div>
+
+                {{if gt .Clone.Statistics.TotalClonePairs 0}}
+                <h3>Top Clone Pairs</h3>
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Type</th>
+                            <th>Location 1</th>
+                            <th>Location 2</th>
+                            <th>Similarity</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {{range $i, $pair := .Clone.ClonePairs}}
+                        {{if lt $i 20}}
+                        <tr>
+                            <td>{{$pair.Type}}</td>
+                            <td>{{$pair.Clone1.Location.FilePath}}:{{$pair.Clone1.Location.StartLine}}</td>
+                            <td>{{$pair.Clone2.Location.FilePath}}:{{$pair.Clone2.Location.StartLine}}</td>
+                            <td>{{printf "%.1f%%" (mul $pair.Similarity 100)}}</td>
+                        </tr>
+                        {{end}}
+                        {{end}}
+                    </tbody>
+                </table>
+                {{if gt (len .Clone.ClonePairs) 20}}
+                <p style="color: #666; margin-top: 10px;">Showing top 20 of {{len .Clone.ClonePairs}} clone pairs</p>
+                {{end}}
+                {{else}}
+                <p style="color: #4caf50; font-weight: bold; margin-top: 20px;">✓ No code clones detected</p>
+                {{end}}
+            </div>
+            {{end}}
+
+            {{if .HasCBO}}
+            <div id="cbo" class="tab-content">
+                <div class="tab-header-with-score">
+                    <h2 style="margin: 0;">Coupling Analysis (CBO)</h2>
+                    <div class="score-badge-compact score-{{scoreQuality .Summary.CouplingScore}}">
+                        {{.Summary.CouplingScore}}/100
+                    </div>
+                </div>
+
+                <div class="metric-grid">
+                    <div class="metric-card">
+                        <div class="metric-value">{{.CBO.Summary.TotalClasses}}</div>
+                        <div class="metric-label">Classes Analyzed</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-value">{{printf "%.2f" .CBO.Summary.AverageCBO}}</div>
+                        <div class="metric-label">Average CBO</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-value">{{.CBO.Summary.HighRiskClasses}}</div>
+                        <div class="metric-label">High Coupling</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-value">{{.CBO.Summary.MediumRiskClasses}}</div>
+                        <div class="metric-label">Medium Coupling</div>
+                    </div>
+                </div>
+
+                {{if gt .CBO.Summary.TotalClasses 0}}
+                <h3>Classes by Coupling</h3>
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Class</th>
+                            <th>File</th>
+                            <th>CBO</th>
+                            <th>Risk</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {{range $i, $class := .CBO.Classes}}
+                        {{if lt $i 20}}
+                        <tr>
+                            <td>{{$class.Name}}</td>
+                            <td>{{$class.FilePath}}</td>
+                            <td>{{$class.Metrics.CouplingCount}}</td>
+                            <td class="risk-{{$class.RiskLevel}}">{{$class.RiskLevel}}</td>
+                        </tr>
+                        {{end}}
+                        {{end}}
+                    </tbody>
+                </table>
+                {{if gt (len .CBO.Classes) 20}}
+                <p style="color: #666; margin-top: 10px;">Showing top 20 of {{len .CBO.Classes}} classes</p>
+                {{end}}
+                {{else}}
+                <p style="color: #666; margin-top: 20px;">No classes found for CBO analysis</p>
+                {{end}}
+            </div>
+            {{end}}
+
+            {{if .HasDeps}}
+            <div id="deps" class="tab-content">
+                <div class="tab-header-with-score">
+                    <h2 style="margin: 0;">Dependency Analysis</h2>
+                    <div class="score-badge-compact score-{{scoreQuality .Summary.DependencyScore}}">
+                        {{.Summary.DependencyScore}}/100
+                    </div>
+                </div>
+
+                <div class="metric-grid">
+                    <div class="metric-card">
+                        <div class="metric-value">{{.Summary.DepsTotalModules}}</div>
+                        <div class="metric-label">Total Modules</div>
+                    </div>
+                    {{if .Deps.Analysis}}
+                    <div class="metric-card">
+                        <div class="metric-value">{{len .Deps.Analysis.RootModules}}</div>
+                        <div class="metric-label">Entry Points</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-value">{{.Deps.Analysis.MaxDepth}}</div>
+                        <div class="metric-label">Max Depth</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-value">{{.Summary.DepsModulesInCycles}}</div>
+                        <div class="metric-label">In Cycles</div>
+                    </div>
+                    {{end}}
+                </div>
+
+                {{if .Deps.Analysis}}
+                {{if .Deps.Analysis.CircularDependencies}}
+                {{if .Deps.Analysis.CircularDependencies.HasCircularDependencies}}
+                <h3 style="color: #f44336;">Circular Dependencies</h3>
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Severity</th>
+                            <th>Modules in Cycle</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {{range $i, $cycle := .Deps.Analysis.CircularDependencies.CircularDependencies}}
+                        {{if lt $i 10}}
+                        <tr>
+                            <td>{{add $i 1}}</td>
+                            <td class="severity-{{$cycle.Severity}}">{{$cycle.Severity}}</td>
+                            <td>{{join $cycle.Modules " → "}}</td>
+                        </tr>
+                        {{end}}
+                        {{end}}
+                    </tbody>
+                </table>
+                {{if gt (len .Deps.Analysis.CircularDependencies.CircularDependencies) 10}}
+                <p style="color: #666; margin-top: 10px;">Showing 10 of {{len .Deps.Analysis.CircularDependencies.CircularDependencies}} cycles</p>
+                {{end}}
+                {{else}}
+                <p style="color: #4caf50; font-weight: bold; margin-top: 20px;">✓ No circular dependencies detected</p>
+                {{end}}
+                {{end}}
                 {{end}}
             </div>
             {{end}}

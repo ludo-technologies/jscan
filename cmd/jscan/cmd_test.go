@@ -49,9 +49,9 @@ func TestAnalyzeCmd_DefaultValues(t *testing.T) {
 	if selectFlag == nil {
 		t.Fatal("select flag not found")
 	}
-	// Default is complexity,deadcode
-	if selectFlag.DefValue != "[complexity,deadcode]" {
-		t.Errorf("Expected default select to be '[complexity,deadcode]', got '%s'", selectFlag.DefValue)
+	// Default is all analyses
+	if selectFlag.DefValue != "[complexity,deadcode,clone,cbo,deps]" {
+		t.Errorf("Expected default select to be '[complexity,deadcode,clone,cbo,deps]', got '%s'", selectFlag.DefValue)
 	}
 }
 

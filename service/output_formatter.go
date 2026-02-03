@@ -50,24 +50,60 @@ type ComplexityResponseJSON struct {
 
 // DeadCodeResponseJSON wraps DeadCodeResponse with JSON metadata
 type DeadCodeResponseJSON struct {
+	Version     string                 `json:"version"`
+	GeneratedAt string                 `json:"generated_at"`
+	DurationMs  int64                  `json:"duration_ms,omitempty"`
+	Files       []domain.FileDeadCode  `json:"files"`
+	Summary     domain.DeadCodeSummary `json:"summary"`
+	Warnings    []string               `json:"warnings,omitempty"`
+	Errors      []string               `json:"errors,omitempty"`
+	Config      interface{}            `json:"config,omitempty"`
+}
+
+// CloneResponseJSON wraps CloneResponse with JSON metadata
+type CloneResponseJSON struct {
 	Version     string                  `json:"version"`
 	GeneratedAt string                  `json:"generated_at"`
 	DurationMs  int64                   `json:"duration_ms,omitempty"`
-	Files       []domain.FileDeadCode   `json:"files"`
-	Summary     domain.DeadCodeSummary  `json:"summary"`
-	Warnings    []string                `json:"warnings,omitempty"`
-	Errors      []string                `json:"errors,omitempty"`
+	ClonePairs  []*domain.ClonePair     `json:"clone_pairs"`
+	CloneGroups []*domain.CloneGroup    `json:"clone_groups"`
+	Statistics  *domain.CloneStatistics `json:"statistics"`
 	Config      interface{}             `json:"config,omitempty"`
+}
+
+// CBOResponseJSON wraps CBOResponse with JSON metadata
+type CBOResponseJSON struct {
+	Version     string                `json:"version"`
+	GeneratedAt string                `json:"generated_at"`
+	DurationMs  int64                 `json:"duration_ms,omitempty"`
+	Classes     []domain.ClassCoupling `json:"classes"`
+	Summary     domain.CBOSummary     `json:"summary"`
+	Warnings    []string              `json:"warnings,omitempty"`
+	Errors      []string              `json:"errors,omitempty"`
+	Config      interface{}           `json:"config,omitempty"`
+}
+
+// DepsResponseJSON wraps DependencyGraphResponse with JSON metadata
+type DepsResponseJSON struct {
+	Version     string                         `json:"version"`
+	GeneratedAt string                         `json:"generated_at"`
+	Graph       *domain.DependencyGraph        `json:"graph,omitempty"`
+	Analysis    *domain.DependencyAnalysisResult `json:"analysis,omitempty"`
+	Warnings    []string                       `json:"warnings,omitempty"`
+	Errors      []string                       `json:"errors,omitempty"`
 }
 
 // AnalyzeResponseJSON represents the unified analysis response for JSON output
 type AnalyzeResponseJSON struct {
-	Version     string                      `json:"version"`
-	GeneratedAt string                      `json:"generated_at"`
-	DurationMs  int64                       `json:"duration_ms"`
-	Complexity  *ComplexityResponseJSON     `json:"complexity,omitempty"`
-	DeadCode    *DeadCodeResponseJSON       `json:"dead_code,omitempty"`
-	Summary     *domain.AnalyzeSummary      `json:"summary,omitempty"`
+	Version     string                  `json:"version"`
+	GeneratedAt string                  `json:"generated_at"`
+	DurationMs  int64                   `json:"duration_ms"`
+	Complexity  *ComplexityResponseJSON `json:"complexity,omitempty"`
+	DeadCode    *DeadCodeResponseJSON   `json:"dead_code,omitempty"`
+	Clone       *CloneResponseJSON      `json:"clone,omitempty"`
+	CBO         *CBOResponseJSON        `json:"cbo,omitempty"`
+	Deps        *DepsResponseJSON       `json:"deps,omitempty"`
+	Summary     *domain.AnalyzeSummary  `json:"summary,omitempty"`
 }
 
 // Write writes the complexity response in the specified format
@@ -98,21 +134,24 @@ func (f *OutputFormatterImpl) WriteDeadCode(response *domain.DeadCodeResponse, f
 func (f *OutputFormatterImpl) WriteAnalyze(
 	complexityResponse *domain.ComplexityResponse,
 	deadCodeResponse *domain.DeadCodeResponse,
+	cloneResponse *domain.CloneResponse,
+	cboResponse *domain.CBOResponse,
+	depsResponse *domain.DependencyGraphResponse,
 	format domain.OutputFormat,
 	writer io.Writer,
 	duration time.Duration,
 ) error {
 	switch format {
 	case domain.OutputFormatJSON:
-		return f.writeAnalyzeJSON(complexityResponse, deadCodeResponse, writer, duration)
+		return f.writeAnalyzeJSON(complexityResponse, deadCodeResponse, cloneResponse, cboResponse, depsResponse, writer, duration)
 	case domain.OutputFormatText:
-		return f.writeAnalyzeText(complexityResponse, deadCodeResponse, writer, duration)
+		return f.writeAnalyzeText(complexityResponse, deadCodeResponse, cloneResponse, cboResponse, depsResponse, writer, duration)
 	case domain.OutputFormatHTML:
-		return f.WriteHTML(complexityResponse, deadCodeResponse, writer, duration)
+		return f.WriteHTML(complexityResponse, deadCodeResponse, cloneResponse, cboResponse, depsResponse, writer, duration)
 	case domain.OutputFormatYAML:
-		return f.writeAnalyzeYAML(complexityResponse, deadCodeResponse, writer, duration)
+		return f.writeAnalyzeYAML(complexityResponse, deadCodeResponse, cloneResponse, cboResponse, depsResponse, writer, duration)
 	case domain.OutputFormatCSV:
-		return f.writeAnalyzeCSV(complexityResponse, deadCodeResponse, writer, duration)
+		return f.writeAnalyzeCSV(complexityResponse, deadCodeResponse, cloneResponse, cboResponse, depsResponse, writer, duration)
 	default:
 		return fmt.Errorf("unsupported output format: %s", format)
 	}
@@ -150,6 +189,9 @@ func (f *OutputFormatterImpl) writeDeadCodeJSON(response *domain.DeadCodeRespons
 func (f *OutputFormatterImpl) writeAnalyzeJSON(
 	complexityResponse *domain.ComplexityResponse,
 	deadCodeResponse *domain.DeadCodeResponse,
+	cloneResponse *domain.CloneResponse,
+	cboResponse *domain.CBOResponse,
+	depsResponse *domain.DependencyGraphResponse,
 	writer io.Writer,
 	duration time.Duration,
 ) error {
@@ -203,11 +245,101 @@ func (f *OutputFormatterImpl) writeAnalyzeJSON(
 		}
 	}
 
+	// Add clone data if available
+	if cloneResponse != nil {
+		response.Clone = &CloneResponseJSON{
+			Version:     version.Version,
+			GeneratedAt: now.Format(time.RFC3339),
+			DurationMs:  cloneResponse.Duration,
+			ClonePairs:  cloneResponse.ClonePairs,
+			CloneGroups: cloneResponse.CloneGroups,
+			Statistics:  cloneResponse.Statistics,
+		}
+		summary.CloneEnabled = true
+		if cloneResponse.Statistics != nil {
+			summary.TotalClones = cloneResponse.Statistics.TotalClones
+			summary.ClonePairs = cloneResponse.Statistics.TotalClonePairs
+			summary.CloneGroups = cloneResponse.Statistics.TotalCloneGroups
+			// Calculate code duplication percentage
+			summary.CodeDuplication = calculateDuplicationPercentage(cloneResponse)
+		}
+	}
+
+	// Add CBO data if available
+	if cboResponse != nil {
+		response.CBO = &CBOResponseJSON{
+			Version:     version.Version,
+			GeneratedAt: cboResponse.GeneratedAt,
+			Classes:     cboResponse.Classes,
+			Summary:     cboResponse.Summary,
+			Warnings:    cboResponse.Warnings,
+			Errors:      cboResponse.Errors,
+			Config:      cboResponse.Config,
+		}
+		summary.CBOEnabled = true
+		summary.CBOClasses = cboResponse.Summary.TotalClasses
+		summary.HighCouplingClasses = cboResponse.Summary.HighRiskClasses
+		summary.MediumCouplingClasses = cboResponse.Summary.MediumRiskClasses
+		summary.AverageCoupling = cboResponse.Summary.AverageCBO
+	}
+
+	// Add deps data if available
+	if depsResponse != nil {
+		response.Deps = &DepsResponseJSON{
+			Version:     version.Version,
+			GeneratedAt: depsResponse.GeneratedAt,
+			Graph:       depsResponse.Graph,
+			Analysis:    depsResponse.Analysis,
+			Warnings:    depsResponse.Warnings,
+			Errors:      depsResponse.Errors,
+		}
+		summary.DepsEnabled = true
+		if depsResponse.Graph != nil {
+			summary.DepsTotalModules = depsResponse.Graph.NodeCount()
+		}
+		if depsResponse.Analysis != nil {
+			if depsResponse.Analysis.CircularDependencies != nil {
+				summary.DepsModulesInCycles = depsResponse.Analysis.CircularDependencies.TotalModulesInCycles
+			}
+			summary.DepsMaxDepth = depsResponse.Analysis.MaxDepth
+		}
+	}
+
 	// Calculate health score
 	_ = summary.CalculateHealthScore()
 	response.Summary = summary
 
 	return WriteJSON(writer, response)
+}
+
+// calculateDuplicationPercentage calculates the percentage of duplicated code
+func calculateDuplicationPercentage(response *domain.CloneResponse) float64 {
+	if response == nil || response.Statistics == nil || response.Statistics.LinesAnalyzed == 0 {
+		return 0.0
+	}
+
+	// Estimate duplicated lines from clone pairs
+	duplicatedLines := 0
+	seenLocations := make(map[string]bool)
+
+	for _, pair := range response.ClonePairs {
+		if pair.Clone1 != nil && pair.Clone1.Location != nil {
+			key := pair.Clone1.Location.String()
+			if !seenLocations[key] {
+				seenLocations[key] = true
+				duplicatedLines += pair.Clone1.LineCount
+			}
+		}
+		if pair.Clone2 != nil && pair.Clone2.Location != nil {
+			key := pair.Clone2.Location.String()
+			if !seenLocations[key] {
+				seenLocations[key] = true
+				duplicatedLines += pair.Clone2.LineCount
+			}
+		}
+	}
+
+	return float64(duplicatedLines) / float64(response.Statistics.LinesAnalyzed) * 100.0
 }
 
 // writeComplexityText writes complexity response as plain text
@@ -327,6 +459,9 @@ func (f *OutputFormatterImpl) writeDeadCodeText(response *domain.DeadCodeRespons
 func (f *OutputFormatterImpl) writeAnalyzeText(
 	complexityResponse *domain.ComplexityResponse,
 	deadCodeResponse *domain.DeadCodeResponse,
+	cloneResponse *domain.CloneResponse,
+	cboResponse *domain.CBOResponse,
+	depsResponse *domain.DependencyGraphResponse,
 	writer io.Writer,
 	duration time.Duration,
 ) error {
@@ -349,6 +484,142 @@ func (f *OutputFormatterImpl) writeAnalyzeText(
 		}
 	}
 
+	// Clone detection results
+	if cloneResponse != nil {
+		if err := f.writeCloneText(cloneResponse, writer); err != nil {
+			return err
+		}
+	}
+
+	// CBO analysis results
+	if cboResponse != nil {
+		if err := f.writeCBOText(cboResponse, writer); err != nil {
+			return err
+		}
+	}
+
+	// Dependency analysis results
+	if depsResponse != nil {
+		if err := f.writeDepsText(depsResponse, writer); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// writeDepsText writes dependency analysis results as plain text
+func (f *OutputFormatterImpl) writeDepsText(response *domain.DependencyGraphResponse, writer io.Writer) error {
+	fmt.Fprintf(writer, "\n=== Dependency Analysis ===\n\n")
+
+	if response.Graph != nil {
+		fmt.Fprintf(writer, "Summary:\n")
+		fmt.Fprintf(writer, "  Total modules: %d\n", response.Graph.NodeCount())
+		fmt.Fprintf(writer, "  Total dependencies: %d\n", response.Graph.EdgeCount())
+	}
+
+	if response.Analysis != nil {
+		fmt.Fprintf(writer, "  Entry points: %d\n", len(response.Analysis.RootModules))
+		fmt.Fprintf(writer, "  Leaf modules: %d\n", len(response.Analysis.LeafModules))
+		fmt.Fprintf(writer, "  Max depth: %d\n", response.Analysis.MaxDepth)
+
+		if response.Analysis.CircularDependencies != nil && response.Analysis.CircularDependencies.HasCircularDependencies {
+			cd := response.Analysis.CircularDependencies
+			fmt.Fprintf(writer, "\nCircular Dependencies:\n")
+			fmt.Fprintf(writer, "  Cycles found: %d\n", cd.TotalCycles)
+			fmt.Fprintf(writer, "  Modules in cycles: %d\n", cd.TotalModulesInCycles)
+
+			for i, cycle := range cd.CircularDependencies {
+				if i >= 5 {
+					fmt.Fprintf(writer, "  ... and %d more cycles\n", len(cd.CircularDependencies)-5)
+					break
+				}
+				fmt.Fprintf(writer, "  Cycle %d [%s]: %v\n", i+1, cycle.Severity, cycle.Modules)
+			}
+		} else {
+			fmt.Fprintf(writer, "\nNo circular dependencies detected.\n")
+		}
+	}
+
+	return nil
+}
+
+// writeCloneText writes clone detection results as plain text
+func (f *OutputFormatterImpl) writeCloneText(response *domain.CloneResponse, writer io.Writer) error {
+	fmt.Fprintf(writer, "\n=== Clone Detection ===\n\n")
+
+	if response.Statistics != nil {
+		fmt.Fprintf(writer, "Statistics:\n")
+		fmt.Fprintf(writer, "  Total clone pairs: %d\n", response.Statistics.TotalClonePairs)
+		fmt.Fprintf(writer, "  Total clone groups: %d\n", response.Statistics.TotalCloneGroups)
+		fmt.Fprintf(writer, "  Files analyzed: %d\n", response.Statistics.FilesAnalyzed)
+		fmt.Fprintf(writer, "  Average similarity: %.2f\n", response.Statistics.AverageSimilarity)
+		fmt.Fprintf(writer, "\n")
+
+		// Clone type distribution
+		if len(response.Statistics.ClonesByType) > 0 {
+			fmt.Fprintf(writer, "Clone Types:\n")
+			for cloneType, count := range response.Statistics.ClonesByType {
+				fmt.Fprintf(writer, "  %s: %d\n", cloneType, count)
+			}
+			fmt.Fprintf(writer, "\n")
+		}
+	}
+
+	// Top clone pairs
+	if len(response.ClonePairs) > 0 {
+		fmt.Fprintf(writer, "Top Clone Pairs:\n")
+		limit := 10
+		if len(response.ClonePairs) < limit {
+			limit = len(response.ClonePairs)
+		}
+		for i := 0; i < limit; i++ {
+			pair := response.ClonePairs[i]
+			loc1 := "unknown"
+			loc2 := "unknown"
+			if pair.Clone1 != nil && pair.Clone1.Location != nil {
+				loc1 = pair.Clone1.Location.String()
+			}
+			if pair.Clone2 != nil && pair.Clone2.Location != nil {
+				loc2 = pair.Clone2.Location.String()
+			}
+			fmt.Fprintf(writer, "  %s: %s <-> %s (%.1f%% similar)\n",
+				pair.Type.String(), loc1, loc2, pair.Similarity*100)
+		}
+	} else {
+		fmt.Fprintf(writer, "No code clones detected.\n")
+	}
+
+	return nil
+}
+
+// writeCBOText writes CBO analysis results as plain text
+func (f *OutputFormatterImpl) writeCBOText(response *domain.CBOResponse, writer io.Writer) error {
+	fmt.Fprintf(writer, "\n=== CBO Analysis ===\n\n")
+
+	fmt.Fprintf(writer, "Summary:\n")
+	fmt.Fprintf(writer, "  Total classes: %d\n", response.Summary.TotalClasses)
+	fmt.Fprintf(writer, "  Average CBO: %.2f\n", response.Summary.AverageCBO)
+	fmt.Fprintf(writer, "  Max CBO: %d\n", response.Summary.MaxCBO)
+	fmt.Fprintf(writer, "\n")
+
+	fmt.Fprintf(writer, "Risk Distribution:\n")
+	fmt.Fprintf(writer, "  High risk: %d\n", response.Summary.HighRiskClasses)
+	fmt.Fprintf(writer, "  Medium risk: %d\n", response.Summary.MediumRiskClasses)
+	fmt.Fprintf(writer, "  Low risk: %d\n", response.Summary.LowRiskClasses)
+	fmt.Fprintf(writer, "\n")
+
+	// Top coupled classes
+	if len(response.Summary.MostCoupledClasses) > 0 {
+		fmt.Fprintf(writer, "Most Coupled Classes:\n")
+		for _, class := range response.Summary.MostCoupledClasses {
+			fmt.Fprintf(writer, "  %s: CBO=%d [%s]\n",
+				class.Name, class.Metrics.CouplingCount, class.RiskLevel)
+		}
+	} else if len(response.Classes) == 0 {
+		fmt.Fprintf(writer, "No classes found for CBO analysis.\n")
+	}
+
 	return nil
 }
 
@@ -356,6 +627,9 @@ func (f *OutputFormatterImpl) writeAnalyzeText(
 func (f *OutputFormatterImpl) writeAnalyzeYAML(
 	complexityResponse *domain.ComplexityResponse,
 	deadCodeResponse *domain.DeadCodeResponse,
+	cloneResponse *domain.CloneResponse,
+	cboResponse *domain.CBOResponse,
+	depsResponse *domain.DependencyGraphResponse,
 	writer io.Writer,
 	duration time.Duration,
 ) error {
@@ -409,6 +683,65 @@ func (f *OutputFormatterImpl) writeAnalyzeYAML(
 		}
 	}
 
+	// Add clone data if available
+	if cloneResponse != nil {
+		response.Clone = &CloneResponseJSON{
+			Version:     version.Version,
+			GeneratedAt: now.Format(time.RFC3339),
+			DurationMs:  cloneResponse.Duration,
+			ClonePairs:  cloneResponse.ClonePairs,
+			CloneGroups: cloneResponse.CloneGroups,
+			Statistics:  cloneResponse.Statistics,
+		}
+		summary.CloneEnabled = true
+		if cloneResponse.Statistics != nil {
+			summary.TotalClones = cloneResponse.Statistics.TotalClones
+			summary.ClonePairs = cloneResponse.Statistics.TotalClonePairs
+			summary.CloneGroups = cloneResponse.Statistics.TotalCloneGroups
+			summary.CodeDuplication = calculateDuplicationPercentage(cloneResponse)
+		}
+	}
+
+	// Add CBO data if available
+	if cboResponse != nil {
+		response.CBO = &CBOResponseJSON{
+			Version:     version.Version,
+			GeneratedAt: cboResponse.GeneratedAt,
+			Classes:     cboResponse.Classes,
+			Summary:     cboResponse.Summary,
+			Warnings:    cboResponse.Warnings,
+			Errors:      cboResponse.Errors,
+			Config:      cboResponse.Config,
+		}
+		summary.CBOEnabled = true
+		summary.CBOClasses = cboResponse.Summary.TotalClasses
+		summary.HighCouplingClasses = cboResponse.Summary.HighRiskClasses
+		summary.MediumCouplingClasses = cboResponse.Summary.MediumRiskClasses
+		summary.AverageCoupling = cboResponse.Summary.AverageCBO
+	}
+
+	// Add deps data if available
+	if depsResponse != nil {
+		response.Deps = &DepsResponseJSON{
+			Version:     version.Version,
+			GeneratedAt: depsResponse.GeneratedAt,
+			Graph:       depsResponse.Graph,
+			Analysis:    depsResponse.Analysis,
+			Warnings:    depsResponse.Warnings,
+			Errors:      depsResponse.Errors,
+		}
+		summary.DepsEnabled = true
+		if depsResponse.Graph != nil {
+			summary.DepsTotalModules = depsResponse.Graph.NodeCount()
+		}
+		if depsResponse.Analysis != nil {
+			if depsResponse.Analysis.CircularDependencies != nil {
+				summary.DepsModulesInCycles = depsResponse.Analysis.CircularDependencies.TotalModulesInCycles
+			}
+			summary.DepsMaxDepth = depsResponse.Analysis.MaxDepth
+		}
+	}
+
 	// Calculate health score
 	_ = summary.CalculateHealthScore()
 	response.Summary = summary
@@ -423,11 +756,16 @@ func (f *OutputFormatterImpl) writeAnalyzeYAML(
 func (f *OutputFormatterImpl) writeAnalyzeCSV(
 	complexityResponse *domain.ComplexityResponse,
 	deadCodeResponse *domain.DeadCodeResponse,
+	cloneResponse *domain.CloneResponse,
+	cboResponse *domain.CBOResponse,
+	depsResponse *domain.DependencyGraphResponse,
 	writer io.Writer,
 	duration time.Duration,
 ) error {
 	csvWriter := csv.NewWriter(writer)
 	defer csvWriter.Flush()
+
+	needsSeparator := false
 
 	// Write complexity results
 	if complexityResponse != nil {
@@ -456,29 +794,21 @@ func (f *OutputFormatterImpl) writeAnalyzeCSV(
 				return err
 			}
 		}
+		needsSeparator = true
 	}
 
 	// Write dead code results
 	if deadCodeResponse != nil {
-		// Write header if no complexity data
-		if complexityResponse == nil {
-			if err := csvWriter.Write([]string{
-				"type", "file", "function", "start_line", "end_line",
-				"severity", "reason", "description",
-			}); err != nil {
-				return err
-			}
-		} else {
-			// Write empty line to separate sections
+		if needsSeparator {
 			if err := csvWriter.Write([]string{}); err != nil {
 				return err
 			}
-			if err := csvWriter.Write([]string{
-				"type", "file", "function", "start_line", "end_line",
-				"severity", "reason", "description",
-			}); err != nil {
-				return err
-			}
+		}
+		if err := csvWriter.Write([]string{
+			"type", "file", "function", "start_line", "end_line",
+			"severity", "reason", "description",
+		}); err != nil {
+			return err
 		}
 
 		// Write dead code findings
@@ -499,6 +829,76 @@ func (f *OutputFormatterImpl) writeAnalyzeCSV(
 						return err
 					}
 				}
+			}
+		}
+		needsSeparator = true
+	}
+
+	// Write clone results
+	if cloneResponse != nil && len(cloneResponse.ClonePairs) > 0 {
+		if needsSeparator {
+			if err := csvWriter.Write([]string{}); err != nil {
+				return err
+			}
+		}
+		if err := csvWriter.Write([]string{
+			"type", "file1", "start_line1", "end_line1",
+			"file2", "start_line2", "end_line2",
+			"clone_type", "similarity",
+		}); err != nil {
+			return err
+		}
+
+		for _, pair := range cloneResponse.ClonePairs {
+			file1, start1, end1 := "", "0", "0"
+			file2, start2, end2 := "", "0", "0"
+			if pair.Clone1 != nil && pair.Clone1.Location != nil {
+				file1 = pair.Clone1.Location.FilePath
+				start1 = strconv.Itoa(pair.Clone1.Location.StartLine)
+				end1 = strconv.Itoa(pair.Clone1.Location.EndLine)
+			}
+			if pair.Clone2 != nil && pair.Clone2.Location != nil {
+				file2 = pair.Clone2.Location.FilePath
+				start2 = strconv.Itoa(pair.Clone2.Location.StartLine)
+				end2 = strconv.Itoa(pair.Clone2.Location.EndLine)
+			}
+			record := []string{
+				"clone",
+				file1, start1, end1,
+				file2, start2, end2,
+				pair.Type.String(),
+				fmt.Sprintf("%.3f", pair.Similarity),
+			}
+			if err := csvWriter.Write(record); err != nil {
+				return err
+			}
+		}
+		needsSeparator = true
+	}
+
+	// Write CBO results
+	if cboResponse != nil && len(cboResponse.Classes) > 0 {
+		if needsSeparator {
+			if err := csvWriter.Write([]string{}); err != nil {
+				return err
+			}
+		}
+		if err := csvWriter.Write([]string{
+			"type", "class", "file", "cbo", "risk_level",
+		}); err != nil {
+			return err
+		}
+
+		for _, class := range cboResponse.Classes {
+			record := []string{
+				"cbo",
+				class.Name,
+				class.FilePath,
+				strconv.Itoa(class.Metrics.CouplingCount),
+				string(class.RiskLevel),
+			}
+			if err := csvWriter.Write(record); err != nil {
+				return err
 			}
 		}
 	}

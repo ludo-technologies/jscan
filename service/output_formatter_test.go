@@ -217,7 +217,7 @@ func TestOutputFormatterWriteAnalyzeJSON(t *testing.T) {
 	}
 
 	var buf bytes.Buffer
-	err := formatter.WriteAnalyze(complexityResponse, nil, domain.OutputFormatJSON, &buf, 100*time.Millisecond)
+	err := formatter.WriteAnalyze(complexityResponse, nil, nil, nil, nil, domain.OutputFormatJSON, &buf, 100*time.Millisecond)
 	if err != nil {
 		t.Fatalf("WriteAnalyze failed: %v", err)
 	}
@@ -274,7 +274,7 @@ func TestOutputFormatterWriteHTML(t *testing.T) {
 	}
 
 	var buf bytes.Buffer
-	err := formatter.WriteAnalyze(complexityResponse, deadCodeResponse, domain.OutputFormatHTML, &buf, 100*time.Millisecond)
+	err := formatter.WriteAnalyze(complexityResponse, deadCodeResponse, nil, nil, nil, domain.OutputFormatHTML, &buf, 100*time.Millisecond)
 	if err != nil {
 		t.Fatalf("WriteAnalyze with HTML failed: %v", err)
 	}
