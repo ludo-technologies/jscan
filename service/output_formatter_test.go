@@ -240,6 +240,40 @@ func TestOutputFormatterWriteAnalyzeJSON(t *testing.T) {
 	}
 }
 
+func TestOutputFormatterWriteAnalyzeJSON_CloneErrorIncluded(t *testing.T) {
+	formatter := NewOutputFormatter()
+
+	cloneResponse := &domain.CloneResponse{
+		Success: false,
+		Error:   "clone analysis completed with 1 file error(s)",
+		Statistics: &domain.CloneStatistics{
+			LinesAnalyzed: 10,
+		},
+	}
+
+	var buf bytes.Buffer
+	err := formatter.WriteAnalyze(nil, nil, cloneResponse, nil, nil, domain.OutputFormatJSON, &buf, 100*time.Millisecond)
+	if err != nil {
+		t.Fatalf("WriteAnalyze failed: %v", err)
+	}
+
+	var result AnalyzeResponseJSON
+	err = json.Unmarshal(buf.Bytes(), &result)
+	if err != nil {
+		t.Fatalf("Failed to parse output as JSON: %v", err)
+	}
+
+	if result.Clone == nil {
+		t.Fatal("Expected clone response to be present")
+	}
+	if result.Clone.Success {
+		t.Error("Expected clone success=false")
+	}
+	if result.Clone.Error == "" {
+		t.Error("Expected clone error to be present")
+	}
+}
+
 func TestOutputFormatterWriteHTML(t *testing.T) {
 	formatter := NewOutputFormatter()
 
@@ -293,6 +327,27 @@ func TestOutputFormatterWriteHTML(t *testing.T) {
 	}
 	if !strings.Contains(output, "testFunc") {
 		t.Error("Expected output to contain function name 'testFunc'")
+	}
+}
+
+func TestOutputFormatterWriteHTML_CloneNilSafe(t *testing.T) {
+	formatter := NewOutputFormatter()
+
+	cloneResponse := &domain.CloneResponse{
+		ClonePairs: []*domain.ClonePair{
+			{ID: 1},
+		},
+	}
+
+	var buf bytes.Buffer
+	err := formatter.WriteAnalyze(nil, nil, cloneResponse, nil, nil, domain.OutputFormatHTML, &buf, 100*time.Millisecond)
+	if err != nil {
+		t.Fatalf("WriteAnalyze with HTML failed: %v", err)
+	}
+
+	output := buf.String()
+	if !strings.Contains(output, "Clone Detection") {
+		t.Error("Expected output to contain clone section")
 	}
 }
 

@@ -1,6 +1,7 @@
 package service
 
 import (
+	"fmt"
 	"html/template"
 	"io"
 	"strings"
@@ -39,6 +40,19 @@ func (f *OutputFormatterImpl) WriteHTML(
 	duration time.Duration,
 ) error {
 	now := time.Now()
+
+	if cloneResponse != nil {
+		if cloneResponse.Statistics == nil {
+			cloneResponse.Statistics = &domain.CloneStatistics{}
+		}
+		clonePairs := make([]*domain.ClonePair, 0, len(cloneResponse.ClonePairs))
+		for _, pair := range cloneResponse.ClonePairs {
+			if pair != nil {
+				clonePairs = append(clonePairs, pair)
+			}
+		}
+		cloneResponse.ClonePairs = clonePairs
+	}
 
 	// Build summary
 	summary := &domain.AnalyzeSummary{}
@@ -123,6 +137,12 @@ func (f *OutputFormatterImpl) WriteHTML(
 		},
 		"mul": func(a, b float64) float64 {
 			return a * b
+		},
+		"cloneLoc": func(clone *domain.Clone) string {
+			if clone == nil || clone.Location == nil {
+				return "unknown"
+			}
+			return fmt.Sprintf("%s:%d", clone.Location.FilePath, clone.Location.StartLine)
 		},
 		"scoreQuality": func(score int) string {
 			switch {
@@ -626,8 +646,8 @@ const htmlTemplate = `<!DOCTYPE html>
                         {{if lt $i 20}}
                         <tr>
                             <td>{{$pair.Type}}</td>
-                            <td>{{$pair.Clone1.Location.FilePath}}:{{$pair.Clone1.Location.StartLine}}</td>
-                            <td>{{$pair.Clone2.Location.FilePath}}:{{$pair.Clone2.Location.StartLine}}</td>
+                            <td>{{cloneLoc $pair.Clone1}}</td>
+                            <td>{{cloneLoc $pair.Clone2}}</td>
                             <td>{{printf "%.1f%%" (mul $pair.Similarity 100)}}</td>
                         </tr>
                         {{end}}

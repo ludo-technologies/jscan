@@ -69,6 +69,8 @@ type CloneResponseJSON struct {
 	ClonePairs  []*domain.ClonePair     `json:"clone_pairs"`
 	CloneGroups []*domain.CloneGroup    `json:"clone_groups"`
 	Statistics  *domain.CloneStatistics `json:"statistics"`
+	Success     bool                    `json:"success"`
+	Error       string                  `json:"error,omitempty"`
 	Config      interface{}             `json:"config,omitempty"`
 }
 
@@ -255,6 +257,8 @@ func (f *OutputFormatterImpl) writeAnalyzeJSON(
 			ClonePairs:  cloneResponse.ClonePairs,
 			CloneGroups: cloneResponse.CloneGroups,
 			Statistics:  cloneResponse.Statistics,
+			Success:     cloneResponse.Success,
+			Error:       cloneResponse.Error,
 		}
 		summary.CloneEnabled = true
 		if cloneResponse.Statistics != nil {
@@ -693,6 +697,8 @@ func (f *OutputFormatterImpl) writeAnalyzeYAML(
 			ClonePairs:  cloneResponse.ClonePairs,
 			CloneGroups: cloneResponse.CloneGroups,
 			Statistics:  cloneResponse.Statistics,
+			Success:     cloneResponse.Success,
+			Error:       cloneResponse.Error,
 		}
 		summary.CloneEnabled = true
 		if cloneResponse.Statistics != nil {
