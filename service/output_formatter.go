@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"sort"
 	"strconv"
 	"time"
 
@@ -38,14 +39,14 @@ func WriteJSON(writer io.Writer, data interface{}) error {
 
 // ComplexityResponseJSON wraps ComplexityResponse with JSON metadata
 type ComplexityResponseJSON struct {
-	Version     string                     `json:"version"`
-	GeneratedAt string                     `json:"generated_at"`
-	DurationMs  int64                      `json:"duration_ms,omitempty"`
+	Version     string                      `json:"version"`
+	GeneratedAt string                      `json:"generated_at"`
+	DurationMs  int64                       `json:"duration_ms,omitempty"`
 	Functions   []domain.FunctionComplexity `json:"functions"`
-	Summary     domain.ComplexitySummary   `json:"summary"`
-	Warnings    []string                   `json:"warnings,omitempty"`
-	Errors      []string                   `json:"errors,omitempty"`
-	Config      interface{}                `json:"config,omitempty"`
+	Summary     domain.ComplexitySummary    `json:"summary"`
+	Warnings    []string                    `json:"warnings,omitempty"`
+	Errors      []string                    `json:"errors,omitempty"`
+	Config      interface{}                 `json:"config,omitempty"`
 }
 
 // DeadCodeResponseJSON wraps DeadCodeResponse with JSON metadata
@@ -73,24 +74,24 @@ type CloneResponseJSON struct {
 
 // CBOResponseJSON wraps CBOResponse with JSON metadata
 type CBOResponseJSON struct {
-	Version     string                `json:"version"`
-	GeneratedAt string                `json:"generated_at"`
-	DurationMs  int64                 `json:"duration_ms,omitempty"`
+	Version     string                 `json:"version"`
+	GeneratedAt string                 `json:"generated_at"`
+	DurationMs  int64                  `json:"duration_ms,omitempty"`
 	Classes     []domain.ClassCoupling `json:"classes"`
-	Summary     domain.CBOSummary     `json:"summary"`
-	Warnings    []string              `json:"warnings,omitempty"`
-	Errors      []string              `json:"errors,omitempty"`
-	Config      interface{}           `json:"config,omitempty"`
+	Summary     domain.CBOSummary      `json:"summary"`
+	Warnings    []string               `json:"warnings,omitempty"`
+	Errors      []string               `json:"errors,omitempty"`
+	Config      interface{}            `json:"config,omitempty"`
 }
 
 // DepsResponseJSON wraps DependencyGraphResponse with JSON metadata
 type DepsResponseJSON struct {
-	Version     string                         `json:"version"`
-	GeneratedAt string                         `json:"generated_at"`
-	Graph       *domain.DependencyGraph        `json:"graph,omitempty"`
+	Version     string                           `json:"version"`
+	GeneratedAt string                           `json:"generated_at"`
+	Graph       *domain.DependencyGraph          `json:"graph,omitempty"`
 	Analysis    *domain.DependencyAnalysisResult `json:"analysis,omitempty"`
-	Warnings    []string                       `json:"warnings,omitempty"`
-	Errors      []string                       `json:"errors,omitempty"`
+	Warnings    []string                         `json:"warnings,omitempty"`
+	Errors      []string                         `json:"errors,omitempty"`
 }
 
 // AnalyzeResponseJSON represents the unified analysis response for JSON output
@@ -899,6 +900,50 @@ func (f *OutputFormatterImpl) writeAnalyzeCSV(
 			}
 			if err := csvWriter.Write(record); err != nil {
 				return err
+			}
+		}
+		needsSeparator = true
+	}
+
+	// Write dependency graph results
+	if depsResponse != nil && depsResponse.Graph != nil {
+		if needsSeparator {
+			if err := csvWriter.Write([]string{}); err != nil {
+				return err
+			}
+		}
+		if err := csvWriter.Write([]string{
+			"type", "from", "to", "edge_type", "weight",
+		}); err != nil {
+			return err
+		}
+
+		fromIDs := make([]string, 0, len(depsResponse.Graph.Edges))
+		for from := range depsResponse.Graph.Edges {
+			fromIDs = append(fromIDs, from)
+		}
+		sort.Strings(fromIDs)
+
+		for _, from := range fromIDs {
+			edges := append([]*domain.DependencyEdge(nil), depsResponse.Graph.Edges[from]...)
+			sort.Slice(edges, func(i, j int) bool {
+				if edges[i].To == edges[j].To {
+					return edges[i].EdgeType < edges[j].EdgeType
+				}
+				return edges[i].To < edges[j].To
+			})
+
+			for _, edge := range edges {
+				record := []string{
+					"deps",
+					edge.From,
+					edge.To,
+					string(edge.EdgeType),
+					strconv.Itoa(edge.Weight),
+				}
+				if err := csvWriter.Write(record); err != nil {
+					return err
+				}
 			}
 		}
 	}

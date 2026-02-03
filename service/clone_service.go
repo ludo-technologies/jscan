@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/ludo-technologies/jscan/domain"
@@ -102,8 +103,8 @@ func (s *CloneServiceImpl) DetectClones(ctx context.Context, req *domain.CloneRe
 	}
 
 	if len(allFragments) == 0 {
-		// No fragments found, return empty response
-		return &domain.CloneResponse{
+		// No fragments found, return empty response (or partial failure details)
+		response := &domain.CloneResponse{
 			Clones:      []*domain.Clone{},
 			ClonePairs:  []*domain.ClonePair{},
 			CloneGroups: []*domain.CloneGroup{},
@@ -117,8 +118,13 @@ func (s *CloneServiceImpl) DetectClones(ctx context.Context, req *domain.CloneRe
 				FilesAnalyzed:     filesAnalyzed,
 			},
 			Duration: time.Since(startTime).Milliseconds(),
-			Success:  true,
-		}, nil
+			Success:  len(errors) == 0,
+		}
+		if len(errors) > 0 {
+			response.Error = strings.Join(errors, "; ")
+			return response, fmt.Errorf("clone analysis failed for %d file(s)", len(errors))
+		}
+		return response, nil
 	}
 
 	// Determine whether to use LSH acceleration
@@ -148,14 +154,19 @@ func (s *CloneServiceImpl) DetectClones(ctx context.Context, req *domain.CloneRe
 	// Extract unique clones from pairs
 	clones := s.extractUniqueClones(clonePairs)
 
-	return &domain.CloneResponse{
+	response := &domain.CloneResponse{
 		Clones:      clones,
 		ClonePairs:  clonePairs,
 		CloneGroups: cloneGroups,
 		Statistics:  statistics,
 		Duration:    time.Since(startTime).Milliseconds(),
-		Success:     true,
-	}, nil
+		Success:     len(errors) == 0,
+	}
+	if len(errors) > 0 {
+		response.Error = strings.Join(errors, "; ")
+		return response, fmt.Errorf("clone analysis completed with %d file error(s)", len(errors))
+	}
+	return response, nil
 }
 
 // DetectClonesInFiles performs clone detection on specific files

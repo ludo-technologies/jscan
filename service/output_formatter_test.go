@@ -165,10 +165,10 @@ func TestOutputFormatterWriteDeadCodeJSON(t *testing.T) {
 			},
 		},
 		Summary: domain.DeadCodeSummary{
-			TotalFiles:       1,
-			TotalFunctions:   1,
-			TotalFindings:    1,
-			WarningFindings:  1,
+			TotalFiles:      1,
+			TotalFunctions:  1,
+			TotalFindings:   1,
+			WarningFindings: 1,
 		},
 		GeneratedAt: time.Now().Format(time.RFC3339),
 		Version:     "test",
@@ -293,6 +293,40 @@ func TestOutputFormatterWriteHTML(t *testing.T) {
 	}
 	if !strings.Contains(output, "testFunc") {
 		t.Error("Expected output to contain function name 'testFunc'")
+	}
+}
+
+func TestOutputFormatterWriteAnalyzeCSV_WithDeps(t *testing.T) {
+	formatter := NewOutputFormatter()
+
+	graph := domain.NewDependencyGraph()
+	graph.AddNode(&domain.ModuleNode{ID: "src/a.ts", Name: "a", FilePath: "src/a.ts"})
+	graph.AddNode(&domain.ModuleNode{ID: "src/b.ts", Name: "b", FilePath: "src/b.ts"})
+	graph.AddEdge(&domain.DependencyEdge{
+		From:     "src/a.ts",
+		To:       "src/b.ts",
+		EdgeType: domain.EdgeTypeImport,
+		Weight:   1,
+	})
+
+	depsResponse := &domain.DependencyGraphResponse{
+		Graph:       graph,
+		GeneratedAt: time.Now().Format(time.RFC3339),
+		Version:     "test",
+	}
+
+	var buf bytes.Buffer
+	err := formatter.WriteAnalyze(nil, nil, nil, nil, depsResponse, domain.OutputFormatCSV, &buf, 100*time.Millisecond)
+	if err != nil {
+		t.Fatalf("WriteAnalyze with CSV failed: %v", err)
+	}
+
+	output := buf.String()
+	if !strings.Contains(output, "type,from,to,edge_type,weight") {
+		t.Error("Expected CSV header for deps output")
+	}
+	if !strings.Contains(output, "deps,src/a.ts,src/b.ts,import,1") {
+		t.Error("Expected deps CSV row")
 	}
 }
 
