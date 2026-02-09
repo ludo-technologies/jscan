@@ -11,11 +11,11 @@ import (
 func TestDefaultCloneDetectorConfig(t *testing.T) {
 	config := DefaultCloneDetectorConfig()
 
-	if config.MinLines != 20 {
-		t.Errorf("Expected MinLines 20, got %d", config.MinLines)
+	if config.MinLines != 10 {
+		t.Errorf("Expected MinLines 10, got %d", config.MinLines)
 	}
-	if config.MinNodes != 20 {
-		t.Errorf("Expected MinNodes 20, got %d", config.MinNodes)
+	if config.MinNodes != 15 {
+		t.Errorf("Expected MinNodes 15, got %d", config.MinNodes)
 	}
 	if config.CostModelType != "javascript" {
 		t.Errorf("Expected CostModelType 'javascript', got %s", config.CostModelType)
