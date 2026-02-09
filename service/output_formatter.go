@@ -510,6 +510,71 @@ func (f *OutputFormatterImpl) writeAnalyzeText(
 		}
 	}
 
+	// Build summary and calculate health score (mirrors writeAnalyzeJSON logic)
+	summary := &domain.AnalyzeSummary{}
+
+	if complexityResponse != nil {
+		summary.ComplexityEnabled = true
+		summary.TotalFunctions = complexityResponse.Summary.TotalFunctions
+		summary.AverageComplexity = complexityResponse.Summary.AverageComplexity
+		summary.HighComplexityCount = complexityResponse.Summary.HighRiskFunctions
+		summary.AnalyzedFiles = complexityResponse.Summary.FilesAnalyzed
+	}
+
+	if deadCodeResponse != nil {
+		summary.DeadCodeEnabled = true
+		summary.DeadCodeCount = deadCodeResponse.Summary.TotalFindings
+		summary.CriticalDeadCode = deadCodeResponse.Summary.CriticalFindings
+		summary.WarningDeadCode = deadCodeResponse.Summary.WarningFindings
+		summary.InfoDeadCode = deadCodeResponse.Summary.InfoFindings
+		if deadCodeResponse.Summary.TotalFiles > summary.TotalFiles {
+			summary.TotalFiles = deadCodeResponse.Summary.TotalFiles
+		}
+	}
+
+	if cloneResponse != nil {
+		summary.CloneEnabled = true
+		if cloneResponse.Statistics != nil {
+			summary.TotalClones = cloneResponse.Statistics.TotalClones
+			summary.ClonePairs = cloneResponse.Statistics.TotalClonePairs
+			summary.CloneGroups = cloneResponse.Statistics.TotalCloneGroups
+			summary.CodeDuplication = calculateDuplicationPercentage(cloneResponse)
+		}
+	}
+
+	if cboResponse != nil {
+		summary.CBOEnabled = true
+		summary.CBOClasses = cboResponse.Summary.TotalClasses
+		summary.HighCouplingClasses = cboResponse.Summary.HighRiskClasses
+		summary.MediumCouplingClasses = cboResponse.Summary.MediumRiskClasses
+		summary.AverageCoupling = cboResponse.Summary.AverageCBO
+	}
+
+	if depsResponse != nil {
+		summary.DepsEnabled = true
+		if depsResponse.Graph != nil {
+			summary.DepsTotalModules = depsResponse.Graph.NodeCount()
+		}
+		if depsResponse.Analysis != nil {
+			if depsResponse.Analysis.CircularDependencies != nil {
+				summary.DepsModulesInCycles = depsResponse.Analysis.CircularDependencies.TotalModulesInCycles
+			}
+			summary.DepsMaxDepth = depsResponse.Analysis.MaxDepth
+		}
+	}
+
+	_ = summary.CalculateHealthScore()
+
+	// Write Health Score section
+	fmt.Fprintf(writer, "\n=== Health Score ===\n\n")
+	fmt.Fprintf(writer, "Overall: %d/100 (Grade: %s)\n\n", summary.HealthScore, summary.Grade)
+	fmt.Fprintf(writer, "Category Scores:\n")
+	fmt.Fprintf(writer, "  Complexity:       %3d/100\n", summary.ComplexityScore)
+	fmt.Fprintf(writer, "  Dead Code:        %3d/100\n", summary.DeadCodeScore)
+	fmt.Fprintf(writer, "  Code Duplication: %3d/100\n", summary.DuplicationScore)
+	fmt.Fprintf(writer, "  Coupling:         %3d/100\n", summary.CouplingScore)
+	fmt.Fprintf(writer, "  Dependencies:     %3d/100\n", summary.DependencyScore)
+
 	return nil
 }
 

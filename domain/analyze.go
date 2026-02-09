@@ -17,9 +17,9 @@ const (
 	ComplexityPenaltyLow      = 6
 
 	// Code duplication thresholds and penalties
-	DuplicationThresholdHigh   = 20.0
-	DuplicationThresholdMedium = 10.0
-	DuplicationThresholdLow    = 3.0
+	DuplicationThresholdHigh   = 30.0
+	DuplicationThresholdMedium = 15.0
+	DuplicationThresholdLow    = 5.0
 	DuplicationPenaltyHigh     = 20
 	DuplicationPenaltyMedium   = 12
 	DuplicationPenaltyLow      = 6
@@ -218,20 +218,20 @@ func (s *AnalyzeSummary) calculateDeadCodePenalty(normalizationFactor float64) i
 		return 0
 	}
 
-	penalty := int(math.Min(float64(MaxDeadCodePenalty), weightedDeadCode/normalizationFactor))
+	penalty := int(math.Round(math.Min(float64(MaxDeadCodePenalty), weightedDeadCode/normalizationFactor)))
 	return penalty
 }
 
 // calculateDuplicationPenalty calculates the penalty for code duplication (max 20)
 // Uses continuous linear function starting from 1% duplication
 func (s *AnalyzeSummary) calculateDuplicationPenalty() int {
-	// Linear penalty: starts at 1%, reaches max (20) at 8%
-	// Formula: penalty = (duplication - 1) / 7 * 20
+	// Linear penalty: starts at 1%, reaches max (20) at 20%
+	// Formula: penalty = (duplication - 1) / 19 * 20
 	if s.CodeDuplication <= 1.0 {
 		return 0
 	}
 
-	penalty := (s.CodeDuplication - 1.0) / 7.0 * 20.0
+	penalty := (s.CodeDuplication - 1.0) / 19.0 * 20.0
 	if penalty > 20.0 {
 		penalty = 20.0
 	}
@@ -251,9 +251,9 @@ func (s *AnalyzeSummary) calculateCouplingPenalty() int {
 	weightedProblematicClasses := float64(s.HighCouplingClasses) + (0.5 * float64(s.MediumCouplingClasses))
 	ratio := weightedProblematicClasses / float64(s.CBOClasses)
 
-	// Linear penalty: starts at 0%, reaches max (20) at 12%
-	// Formula: penalty = ratio / 0.12 * 20
-	penalty := ratio / 0.12 * 20.0
+	// Linear penalty: starts at 0%, reaches max (20) at 50%
+	// Formula: penalty = ratio / 0.50 * 20
+	penalty := ratio / 0.50 * 20.0
 	if penalty > 20.0 {
 		penalty = 20.0
 	}
