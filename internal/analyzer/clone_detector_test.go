@@ -11,11 +11,11 @@ import (
 func TestDefaultCloneDetectorConfig(t *testing.T) {
 	config := DefaultCloneDetectorConfig()
 
-	if config.MinLines != 5 {
-		t.Errorf("Expected MinLines 5, got %d", config.MinLines)
+	if config.MinLines != 20 {
+		t.Errorf("Expected MinLines 20, got %d", config.MinLines)
 	}
-	if config.MinNodes != 10 {
-		t.Errorf("Expected MinNodes 10, got %d", config.MinNodes)
+	if config.MinNodes != 20 {
+		t.Errorf("Expected MinNodes 20, got %d", config.MinNodes)
 	}
 	if config.CostModelType != "javascript" {
 		t.Errorf("Expected CostModelType 'javascript', got %s", config.CostModelType)
@@ -183,9 +183,10 @@ func TestClassifyCloneType(t *testing.T) {
 		expected   domain.CloneType
 	}{
 		{0.99, domain.Type1Clone},
-		{0.96, domain.Type2Clone},
-		{0.90, domain.Type3Clone},
-		{0.75, domain.Type4Clone},
+		{0.90, domain.Type1Clone},
+		{0.86, domain.Type2Clone},
+		{0.80, domain.Type3Clone},
+		{0.65, domain.Type4Clone},
 		{0.50, 0}, // Not a clone
 	}
 

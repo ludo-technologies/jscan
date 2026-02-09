@@ -124,8 +124,8 @@ type CloneDetectorConfig struct {
 // DefaultCloneDetectorConfig returns default configuration
 func DefaultCloneDetectorConfig() *CloneDetectorConfig {
 	return &CloneDetectorConfig{
-		MinLines:          5,
-		MinNodes:          10,
+		MinLines:          20,
+		MinNodes:          20,
 		Type1Threshold:    constants.DefaultType1CloneThreshold,
 		Type2Threshold:    constants.DefaultType2CloneThreshold,
 		Type3Threshold:    constants.DefaultType3CloneThreshold,

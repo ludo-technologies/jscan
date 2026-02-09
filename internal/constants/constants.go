@@ -31,8 +31,8 @@ const (
 
 // Clone detection threshold constants
 const (
-	DefaultType1CloneThreshold = 0.98
-	DefaultType2CloneThreshold = 0.95
-	DefaultType3CloneThreshold = 0.85
-	DefaultType4CloneThreshold = 0.70
+	DefaultType1CloneThreshold = 0.88
+	DefaultType2CloneThreshold = 0.85
+	DefaultType3CloneThreshold = 0.75
+	DefaultType4CloneThreshold = 0.60
 )

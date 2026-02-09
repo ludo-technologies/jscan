@@ -257,8 +257,8 @@ func DefaultPyscnConfig() *PyscnConfig {
 	return &PyscnConfig{
 		// Clone detection configuration
 		Analysis: CloneAnalysisConfig{
-			MinLines:          5,
-			MinNodes:          10,
+			MinLines:          20,
+			MinNodes:          20,
 			MaxEditDistance:   50.0,
 			IgnoreLiterals:    BoolPtr(false),
 			IgnoreIdentifiers: BoolPtr(false),
