@@ -165,10 +165,10 @@ func TestOutputFormatterWriteDeadCodeJSON(t *testing.T) {
 			},
 		},
 		Summary: domain.DeadCodeSummary{
-			TotalFiles:       1,
-			TotalFunctions:   1,
-			TotalFindings:    1,
-			WarningFindings:  1,
+			TotalFiles:      1,
+			TotalFunctions:  1,
+			TotalFindings:   1,
+			WarningFindings: 1,
 		},
 		GeneratedAt: time.Now().Format(time.RFC3339),
 		Version:     "test",
@@ -217,7 +217,7 @@ func TestOutputFormatterWriteAnalyzeJSON(t *testing.T) {
 	}
 
 	var buf bytes.Buffer
-	err := formatter.WriteAnalyze(complexityResponse, nil, domain.OutputFormatJSON, &buf, 100*time.Millisecond)
+	err := formatter.WriteAnalyze(complexityResponse, nil, nil, nil, nil, domain.OutputFormatJSON, &buf, 100*time.Millisecond)
 	if err != nil {
 		t.Fatalf("WriteAnalyze failed: %v", err)
 	}
@@ -237,6 +237,40 @@ func TestOutputFormatterWriteAnalyzeJSON(t *testing.T) {
 	}
 	if result.Summary.ComplexityEnabled != true {
 		t.Error("Expected complexity to be enabled in summary")
+	}
+}
+
+func TestOutputFormatterWriteAnalyzeJSON_CloneErrorIncluded(t *testing.T) {
+	formatter := NewOutputFormatter()
+
+	cloneResponse := &domain.CloneResponse{
+		Success: false,
+		Error:   "clone analysis completed with 1 file error(s)",
+		Statistics: &domain.CloneStatistics{
+			LinesAnalyzed: 10,
+		},
+	}
+
+	var buf bytes.Buffer
+	err := formatter.WriteAnalyze(nil, nil, cloneResponse, nil, nil, domain.OutputFormatJSON, &buf, 100*time.Millisecond)
+	if err != nil {
+		t.Fatalf("WriteAnalyze failed: %v", err)
+	}
+
+	var result AnalyzeResponseJSON
+	err = json.Unmarshal(buf.Bytes(), &result)
+	if err != nil {
+		t.Fatalf("Failed to parse output as JSON: %v", err)
+	}
+
+	if result.Clone == nil {
+		t.Fatal("Expected clone response to be present")
+	}
+	if result.Clone.Success {
+		t.Error("Expected clone success=false")
+	}
+	if result.Clone.Error == "" {
+		t.Error("Expected clone error to be present")
 	}
 }
 
@@ -274,7 +308,7 @@ func TestOutputFormatterWriteHTML(t *testing.T) {
 	}
 
 	var buf bytes.Buffer
-	err := formatter.WriteAnalyze(complexityResponse, deadCodeResponse, domain.OutputFormatHTML, &buf, 100*time.Millisecond)
+	err := formatter.WriteAnalyze(complexityResponse, deadCodeResponse, nil, nil, nil, domain.OutputFormatHTML, &buf, 100*time.Millisecond)
 	if err != nil {
 		t.Fatalf("WriteAnalyze with HTML failed: %v", err)
 	}
@@ -293,6 +327,61 @@ func TestOutputFormatterWriteHTML(t *testing.T) {
 	}
 	if !strings.Contains(output, "testFunc") {
 		t.Error("Expected output to contain function name 'testFunc'")
+	}
+}
+
+func TestOutputFormatterWriteHTML_CloneNilSafe(t *testing.T) {
+	formatter := NewOutputFormatter()
+
+	cloneResponse := &domain.CloneResponse{
+		ClonePairs: []*domain.ClonePair{
+			{ID: 1},
+		},
+	}
+
+	var buf bytes.Buffer
+	err := formatter.WriteAnalyze(nil, nil, cloneResponse, nil, nil, domain.OutputFormatHTML, &buf, 100*time.Millisecond)
+	if err != nil {
+		t.Fatalf("WriteAnalyze with HTML failed: %v", err)
+	}
+
+	output := buf.String()
+	if !strings.Contains(output, "Clone Detection") {
+		t.Error("Expected output to contain clone section")
+	}
+}
+
+func TestOutputFormatterWriteAnalyzeCSV_WithDeps(t *testing.T) {
+	formatter := NewOutputFormatter()
+
+	graph := domain.NewDependencyGraph()
+	graph.AddNode(&domain.ModuleNode{ID: "src/a.ts", Name: "a", FilePath: "src/a.ts"})
+	graph.AddNode(&domain.ModuleNode{ID: "src/b.ts", Name: "b", FilePath: "src/b.ts"})
+	graph.AddEdge(&domain.DependencyEdge{
+		From:     "src/a.ts",
+		To:       "src/b.ts",
+		EdgeType: domain.EdgeTypeImport,
+		Weight:   1,
+	})
+
+	depsResponse := &domain.DependencyGraphResponse{
+		Graph:       graph,
+		GeneratedAt: time.Now().Format(time.RFC3339),
+		Version:     "test",
+	}
+
+	var buf bytes.Buffer
+	err := formatter.WriteAnalyze(nil, nil, nil, nil, depsResponse, domain.OutputFormatCSV, &buf, 100*time.Millisecond)
+	if err != nil {
+		t.Fatalf("WriteAnalyze with CSV failed: %v", err)
+	}
+
+	output := buf.String()
+	if !strings.Contains(output, "type,from,to,edge_type,weight") {
+		t.Error("Expected CSV header for deps output")
+	}
+	if !strings.Contains(output, "deps,src/a.ts,src/b.ts,import,1") {
+		t.Error("Expected deps CSV row")
 	}
 }
 

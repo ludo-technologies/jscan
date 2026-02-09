@@ -33,21 +33,24 @@ func analyzeCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "analyze [path...]",
 		Short: "Analyze JavaScript/TypeScript files",
-		Long: `Analyze JavaScript/TypeScript files for complexity, dead code, and other issues.
+		Long: `Analyze JavaScript/TypeScript files for complexity, dead code, code clones, and coupling.
 
 By default, generates an HTML report and opens it in your browser.
 
 Examples:
-  jscan analyze src/                    # Generate HTML report (default)
-  jscan analyze --json src/             # Output JSON to stdout
-  jscan analyze --text src/             # Output text to stdout
-  jscan analyze --no-open src/          # Generate HTML without opening browser
-  jscan analyze -o report.html src/     # Custom output path`,
+  jscan analyze src/                              # All analyses (default)
+  jscan analyze --select complexity,deadcode src/ # Complexity + dead code only
+  jscan analyze --select clone src/               # Clone detection only
+  jscan analyze --select cbo src/                 # CBO coupling analysis only
+  jscan analyze --json src/                       # Output JSON to stdout
+  jscan analyze --text src/                       # Output text to stdout
+  jscan analyze --no-open src/                    # Generate HTML without opening browser
+  jscan analyze -o report.html src/               # Custom output path`,
 		RunE: runAnalyze,
 	}
 
-	cmd.Flags().StringSliceVarP(&selectAnalyses, "select", "s", []string{"complexity", "deadcode"},
-		"Analyses to run (comma-separated): complexity,deadcode")
+	cmd.Flags().StringSliceVarP(&selectAnalyses, "select", "s", []string{"complexity", "deadcode", "clone", "cbo", "deps"},
+		"Analyses to run (comma-separated): complexity,deadcode,clone,cbo,deps")
 	cmd.Flags().StringVarP(&outputFormat, "format", "f", "html",
 		"Output format: html, json, text (default: html)")
 	cmd.Flags().BoolVar(&jsonOutput, "json", false,
@@ -116,10 +119,16 @@ func runAnalyze(cmd *cobra.Command, args []string) error {
 	// Initialize responses
 	var complexityResponse *domain.ComplexityResponse
 	var deadCodeResponse *domain.DeadCodeResponse
+	var cloneResponse *domain.CloneResponse
+	var cboResponse *domain.CBOResponse
+	var depsResponse *domain.DependencyGraphResponse
 
 	// Determine which analyses to run
 	runComplexity := contains(selectAnalyses, "complexity")
 	runDeadCode := contains(selectAnalyses, "deadcode")
+	runClone := contains(selectAnalyses, "clone")
+	runCBO := contains(selectAnalyses, "cbo")
+	runDeps := contains(selectAnalyses, "deps")
 
 	// Single progress bar for all analyses (only when interactive)
 	var task domain.TaskProgress
@@ -132,8 +141,9 @@ func runAnalyze(cmd *cobra.Command, args []string) error {
 
 	// Run analyses in parallel
 	var wg sync.WaitGroup
-	var complexityErr, deadCodeErr error
+	var complexityErr, deadCodeErr, cloneErr, cboErr, depsErr error
 	var mu sync.Mutex
+	ctx := context.Background()
 
 	if runComplexity {
 		wg.Add(1)
@@ -159,6 +169,42 @@ func runAnalyze(cmd *cobra.Command, args []string) error {
 		}()
 	}
 
+	if runClone {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			resp, err := runCloneAnalysisInternal(ctx, files)
+			mu.Lock()
+			cloneResponse = resp
+			cloneErr = err
+			mu.Unlock()
+		}()
+	}
+
+	if runCBO {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			resp, err := runCBOAnalysisInternal(ctx, files)
+			mu.Lock()
+			cboResponse = resp
+			cboErr = err
+			mu.Unlock()
+		}()
+	}
+
+	if runDeps {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			resp, err := runDepsAnalysisInternal(ctx, files)
+			mu.Lock()
+			depsResponse = resp
+			depsErr = err
+			mu.Unlock()
+		}()
+	}
+
 	wg.Wait()
 	if progressDone != nil {
 		close(progressDone)
@@ -173,6 +219,15 @@ func runAnalyze(cmd *cobra.Command, args []string) error {
 	}
 	if deadCodeErr != nil && format != domain.OutputFormatJSON {
 		fmt.Fprintf(os.Stderr, "Dead code analysis error: %v\n", deadCodeErr)
+	}
+	if cloneErr != nil && format != domain.OutputFormatJSON {
+		fmt.Fprintf(os.Stderr, "Clone analysis error: %v\n", cloneErr)
+	}
+	if cboErr != nil && format != domain.OutputFormatJSON {
+		fmt.Fprintf(os.Stderr, "CBO analysis error: %v\n", cboErr)
+	}
+	if depsErr != nil && format != domain.OutputFormatJSON {
+		fmt.Fprintf(os.Stderr, "Dependency analysis error: %v\n", depsErr)
 	}
 
 	// Calculate duration
@@ -197,7 +252,7 @@ func runAnalyze(cmd *cobra.Command, args []string) error {
 		defer file.Close()
 
 		// Write HTML
-		if err := formatter.WriteAnalyze(complexityResponse, deadCodeResponse, format, file, duration); err != nil {
+		if err := formatter.WriteAnalyze(complexityResponse, deadCodeResponse, cloneResponse, cboResponse, depsResponse, format, file, duration); err != nil {
 			return err
 		}
 
@@ -216,7 +271,7 @@ func runAnalyze(cmd *cobra.Command, args []string) error {
 	}
 
 	// JSON or Text output to stdout
-	return formatter.WriteAnalyze(complexityResponse, deadCodeResponse, format, os.Stdout, duration)
+	return formatter.WriteAnalyze(complexityResponse, deadCodeResponse, cloneResponse, cboResponse, depsResponse, format, os.Stdout, duration)
 }
 
 // runComplexityAnalysisInternal runs complexity analysis on the given files without progress tracking
@@ -411,4 +466,37 @@ func startTimeBasedProgressUpdater(task domain.TaskProgress, estimatedDuration t
 	}()
 
 	return done
+}
+
+// runCloneAnalysisInternal runs clone detection without progress tracking
+func runCloneAnalysisInternal(ctx context.Context, files []string) (*domain.CloneResponse, error) {
+	svc := service.NewCloneServiceWithDefaults()
+
+	req := domain.DefaultCloneRequest()
+	req.Paths = files
+
+	return svc.DetectClones(ctx, req)
+}
+
+// runCBOAnalysisInternal runs CBO analysis without progress tracking
+func runCBOAnalysisInternal(ctx context.Context, files []string) (*domain.CBOResponse, error) {
+	svc := service.NewCBOServiceWithDefaults()
+
+	req := domain.CBORequest{
+		Paths: files,
+	}
+
+	return svc.Analyze(ctx, req)
+}
+
+// runDepsAnalysisInternal runs dependency analysis without progress tracking
+func runDepsAnalysisInternal(ctx context.Context, files []string) (*domain.DependencyGraphResponse, error) {
+	svc := service.NewDependencyGraphServiceWithDefaults()
+
+	req := domain.DependencyGraphRequest{
+		Paths:        files,
+		DetectCycles: domain.BoolPtr(true),
+	}
+
+	return svc.Analyze(ctx, req)
 }

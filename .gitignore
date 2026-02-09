@@ -55,6 +55,8 @@ jscan.config.json
 
 # jscan output directory
 .jscan/
+/jscan-report.html
+/jscan-test
 
 # Claude Code setting (optional)
 .claude/
