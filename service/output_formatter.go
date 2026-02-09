@@ -344,7 +344,11 @@ func calculateDuplicationPercentage(response *domain.CloneResponse) float64 {
 		}
 	}
 
-	return float64(duplicatedLines) / float64(response.Statistics.LinesAnalyzed) * 100.0
+	pct := float64(duplicatedLines) / float64(response.Statistics.LinesAnalyzed) * 100.0
+	if pct > 100.0 {
+		pct = 100.0
+	}
+	return pct
 }
 
 // writeComplexityText writes complexity response as plain text
