@@ -251,9 +251,9 @@ func (s *AnalyzeSummary) calculateCouplingPenalty() int {
 	weightedProblematicClasses := float64(s.HighCouplingClasses) + (0.5 * float64(s.MediumCouplingClasses))
 	ratio := weightedProblematicClasses / float64(s.CBOClasses)
 
-	// Linear penalty: starts at 0%, reaches max (20) at 50%
-	// Formula: penalty = ratio / 0.50 * 20
-	penalty := ratio / 0.50 * 20.0
+	// Linear penalty: starts at 0%, reaches max (20) at 80%
+	// Formula: penalty = ratio / 0.80 * 20
+	penalty := ratio / 0.80 * 20.0
 	if penalty > 20.0 {
 		penalty = 20.0
 	}
