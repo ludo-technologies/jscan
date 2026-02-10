@@ -379,6 +379,183 @@ func TestBuildGraphFromNilResult(t *testing.T) {
 	}
 }
 
+func TestResolveImportTargetWithExtensionResolution(t *testing.T) {
+	config := DefaultDependencyGraphBuilderConfig()
+	config.ProjectRoot = "/project"
+	builder := NewDependencyGraphBuilder(config)
+
+	knownNodeIDs := map[string]bool{
+		"lib/application.js": true,
+		"lib/router.ts":      true,
+		"src/utils.jsx":      true,
+	}
+
+	testCases := []struct {
+		name         string
+		source       string
+		fromFilePath string
+		expected     string
+	}{
+		{
+			name:         "resolves .js extension",
+			source:       "./application",
+			fromFilePath: "/project/lib/index.js",
+			expected:     "lib/application.js",
+		},
+		{
+			name:         "resolves .ts extension",
+			source:       "./router",
+			fromFilePath: "/project/lib/index.js",
+			expected:     "lib/router.ts",
+		},
+		{
+			name:         "resolves .jsx extension",
+			source:       "./utils",
+			fromFilePath: "/project/src/app.js",
+			expected:     "src/utils.jsx",
+		},
+		{
+			name:         "keeps exact match with extension",
+			source:       "./application.js",
+			fromFilePath: "/project/lib/index.js",
+			expected:     "lib/application.js",
+		},
+		{
+			name:         "returns normalized path for unknown module",
+			source:       "./unknown",
+			fromFilePath: "/project/lib/index.js",
+			expected:     "lib/unknown",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			result := builder.resolveImportTarget(tc.source, domain.ModuleTypeRelative, tc.fromFilePath, knownNodeIDs)
+			if result != tc.expected {
+				t.Errorf("resolveImportTarget(%q) = %q, expected %q", tc.source, result, tc.expected)
+			}
+		})
+	}
+}
+
+func TestResolveImportTargetWithIndexResolution(t *testing.T) {
+	config := DefaultDependencyGraphBuilderConfig()
+	config.ProjectRoot = "/project"
+	builder := NewDependencyGraphBuilder(config)
+
+	knownNodeIDs := map[string]bool{
+		"lib/middleware/index.js": true,
+		"src/components/index.ts": true,
+	}
+
+	testCases := []struct {
+		name         string
+		source       string
+		fromFilePath string
+		expected     string
+	}{
+		{
+			name:         "resolves directory to index.js",
+			source:       "./middleware",
+			fromFilePath: "/project/lib/app.js",
+			expected:     "lib/middleware/index.js",
+		},
+		{
+			name:         "resolves directory to index.ts",
+			source:       "./components",
+			fromFilePath: "/project/src/app.ts",
+			expected:     "src/components/index.ts",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			result := builder.resolveImportTarget(tc.source, domain.ModuleTypeRelative, tc.fromFilePath, knownNodeIDs)
+			if result != tc.expected {
+				t.Errorf("resolveImportTarget(%q) = %q, expected %q", tc.source, result, tc.expected)
+			}
+		})
+	}
+}
+
+func TestBuildGraphWithExtensionlessImports(t *testing.T) {
+	// Build a graph where imports omit file extensions (common in Node.js)
+	// and verify internal edges are correctly created without ghost external nodes
+
+	moduleResult := &domain.ModuleAnalysisResult{
+		Files: map[string]*domain.ModuleInfo{
+			"/project/lib/app.js": {
+				Imports: []*domain.Import{
+					{
+						Source:     "./router",
+						SourceType: domain.ModuleTypeRelative,
+					},
+					{
+						Source:     "./utils",
+						SourceType: domain.ModuleTypeRelative,
+					},
+				},
+			},
+			"/project/lib/router.js": {
+				Imports: []*domain.Import{
+					{
+						Source:     "./utils",
+						SourceType: domain.ModuleTypeRelative,
+					},
+				},
+			},
+			"/project/lib/utils.js": {
+				Imports: []*domain.Import{},
+			},
+		},
+	}
+
+	config := DefaultDependencyGraphBuilderConfig()
+	config.ProjectRoot = "/project"
+	builder := NewDependencyGraphBuilder(config)
+	graph := builder.BuildGraph(moduleResult)
+
+	// Should have exactly 3 internal nodes (no ghost external nodes)
+	if graph.NodeCount() != 3 {
+		t.Errorf("Expected 3 nodes, got %d", graph.NodeCount())
+		for id, node := range graph.Nodes {
+			t.Logf("  node: %s (external=%v)", id, node.IsExternal)
+		}
+	}
+
+	// Verify no external nodes exist
+	for id, node := range graph.Nodes {
+		if node.IsExternal {
+			t.Errorf("Unexpected external node: %s", id)
+		}
+	}
+
+	// Verify edges connect to internal nodes
+	appEdges := graph.GetOutgoingEdges("lib/app.js")
+	if len(appEdges) != 2 {
+		t.Errorf("Expected 2 edges from lib/app.js, got %d", len(appEdges))
+	}
+	for _, edge := range appEdges {
+		if edge.To != "lib/router.js" && edge.To != "lib/utils.js" {
+			t.Errorf("Unexpected edge target: %s", edge.To)
+		}
+	}
+
+	routerEdges := graph.GetOutgoingEdges("lib/router.js")
+	if len(routerEdges) != 1 {
+		t.Errorf("Expected 1 edge from lib/router.js, got %d", len(routerEdges))
+	}
+	if len(routerEdges) > 0 && routerEdges[0].To != "lib/utils.js" {
+		t.Errorf("Expected edge to lib/utils.js, got %s", routerEdges[0].To)
+	}
+
+	// utils.js should be a leaf (no outgoing edges)
+	utilsEdges := graph.GetOutgoingEdges("lib/utils.js")
+	if len(utilsEdges) != 0 {
+		t.Errorf("Expected 0 edges from lib/utils.js, got %d", len(utilsEdges))
+	}
+}
+
 func TestBuildGraphFromASTs(t *testing.T) {
 	source := `
 import { helper } from './helper';
