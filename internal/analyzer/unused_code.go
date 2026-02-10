@@ -284,7 +284,11 @@ func resolveImportPath(importingFile, source string, knownFiles map[string]bool)
 func isEntryPointFile(filePath string) bool {
 	base := filepath.Base(filePath)
 	nameWithoutExt := strings.TrimSuffix(base, filepath.Ext(base))
-	return nameWithoutExt == "index"
+	switch nameWithoutExt {
+	case "index", "main", "app", "server":
+		return true
+	}
+	return false
 }
 
 // isTestFile checks if a file is a test file.
@@ -305,4 +309,215 @@ func isTestFile(filePath string) bool {
 	}
 
 	return false
+}
+
+// isConfigFile checks if a file is a configuration or setup file.
+func isConfigFile(filePath string) bool {
+	base := filepath.Base(filePath)
+	parts := strings.Split(base, ".")
+	for _, part := range parts {
+		if part == "config" || part == "setup" {
+			return true
+		}
+	}
+	return false
+}
+
+// DetectOrphanFiles detects files that are not reachable from any entry point via import chains.
+// Entry points are: index/main/app/server files, and files not imported by any other file.
+// Test files and config files are skipped.
+func DetectOrphanFiles(allModuleInfos map[string]*domain.ModuleInfo, analyzedFiles map[string]bool) []*DeadCodeFinding {
+	if len(allModuleInfos) == 0 {
+		return nil
+	}
+
+	// Build forward edges: file → set of files it imports
+	// Build reverse edges: file → set of files that import it
+	reverseEdges := make(map[string]map[string]bool)
+
+	for importingFile, info := range allModuleInfos {
+		for _, imp := range info.Imports {
+			if imp.SourceType != domain.ModuleTypeRelative {
+				continue
+			}
+			resolvedPath := resolveImportPath(importingFile, imp.Source, analyzedFiles)
+			if resolvedPath == "" {
+				continue
+			}
+			if reverseEdges[resolvedPath] == nil {
+				reverseEdges[resolvedPath] = make(map[string]bool)
+			}
+			reverseEdges[resolvedPath][importingFile] = true
+		}
+	}
+
+	// Determine entry points:
+	// 1. Files matching isEntryPointFile (index, main, app, server)
+	// 2. Files not imported by any other file (root files with no reverse edges)
+	entryPoints := make(map[string]bool)
+	for filePath := range allModuleInfos {
+		if isTestFile(filePath) || isConfigFile(filePath) {
+			continue
+		}
+		if isEntryPointFile(filePath) {
+			entryPoints[filePath] = true
+			continue
+		}
+		if len(reverseEdges[filePath]) == 0 {
+			entryPoints[filePath] = true
+		}
+	}
+
+	// BFS from entry points to find all reachable files
+	reachable := make(map[string]bool)
+	queue := make([]string, 0, len(entryPoints))
+	for ep := range entryPoints {
+		reachable[ep] = true
+		queue = append(queue, ep)
+	}
+
+	for len(queue) > 0 {
+		current := queue[0]
+		queue = queue[1:]
+
+		info, ok := allModuleInfos[current]
+		if !ok {
+			continue
+		}
+
+		for _, imp := range info.Imports {
+			if imp.SourceType != domain.ModuleTypeRelative {
+				continue
+			}
+			resolvedPath := resolveImportPath(current, imp.Source, analyzedFiles)
+			if resolvedPath == "" {
+				continue
+			}
+			if !reachable[resolvedPath] {
+				reachable[resolvedPath] = true
+				queue = append(queue, resolvedPath)
+			}
+		}
+	}
+
+	// Files not reachable and not test/config files are orphans
+	var findings []*DeadCodeFinding
+	for filePath := range allModuleInfos {
+		if reachable[filePath] {
+			continue
+		}
+		if isTestFile(filePath) || isConfigFile(filePath) {
+			continue
+		}
+		findings = append(findings, &DeadCodeFinding{
+			FilePath:    filePath,
+			Reason:      ReasonOrphanFile,
+			Severity:    SeverityLevelWarning,
+			Description: "File '" + filepath.Base(filePath) + "' is not reachable from any entry point",
+		})
+	}
+
+	return findings
+}
+
+// DetectUnusedExportedFunctions detects exported functions and classes that are not imported
+// by any other file in the project. Unlike DetectUnusedExports which covers all exports at
+// info severity, this targets only function/class declarations at warning severity.
+func DetectUnusedExportedFunctions(allModuleInfos map[string]*domain.ModuleInfo, analyzedFiles map[string]bool) []*DeadCodeFinding {
+	if len(allModuleInfos) == 0 {
+		return nil
+	}
+
+	// Build reverse index: resolved source path → set of imported names
+	importedNamesFromFile := make(map[string]map[string]bool)
+
+	for importingFile, info := range allModuleInfos {
+		for _, imp := range info.Imports {
+			if imp.SourceType != domain.ModuleTypeRelative {
+				continue
+			}
+
+			resolvedPath := resolveImportPath(importingFile, imp.Source, analyzedFiles)
+			if resolvedPath == "" {
+				continue
+			}
+
+			if importedNamesFromFile[resolvedPath] == nil {
+				importedNamesFromFile[resolvedPath] = make(map[string]bool)
+			}
+
+			switch imp.ImportType {
+			case domain.ImportTypeNamespace:
+				importedNamesFromFile[resolvedPath]["*"] = true
+			case domain.ImportTypeDefault, domain.ImportTypeNamed:
+				for _, spec := range imp.Specifiers {
+					name := spec.Imported
+					if name == "" {
+						name = spec.Local
+					}
+					importedNamesFromFile[resolvedPath][name] = true
+				}
+			case domain.ImportTypeSideEffect:
+				importedNamesFromFile[resolvedPath]["*"] = true
+			}
+		}
+	}
+
+	var findings []*DeadCodeFinding
+
+	for filePath, info := range allModuleInfos {
+		if isEntryPointFile(filePath) {
+			continue
+		}
+		if isTestFile(filePath) {
+			continue
+		}
+
+		importedNames := importedNamesFromFile[filePath]
+
+		// If namespace import (*) exists, all exports are considered used
+		if importedNames != nil && importedNames["*"] {
+			continue
+		}
+
+		for _, exp := range info.Exports {
+			// Skip re-exports
+			if exp.Source != "" {
+				continue
+			}
+			// Skip type-only exports
+			if exp.IsTypeOnly {
+				continue
+			}
+			// Skip export * (re-export all)
+			if exp.ExportType == "all" {
+				continue
+			}
+
+			// Only target function and class declarations
+			if exp.Declaration != "function" && exp.Declaration != "class" {
+				// Also handle default exports of functions/classes
+				if exp.ExportType != "default" || (exp.Declaration != "function" && exp.Declaration != "class") {
+					continue
+				}
+			}
+
+			exportedNames := getExportedNames(exp)
+
+			for _, name := range exportedNames {
+				if importedNames == nil || !importedNames[name] {
+					findings = append(findings, &DeadCodeFinding{
+						FilePath:    filePath,
+						StartLine:   exp.Location.StartLine,
+						EndLine:     exp.Location.EndLine,
+						Reason:      ReasonUnusedExportedFunction,
+						Severity:    SeverityLevelWarning,
+						Description: "Exported function '" + name + "' is not imported by any other analyzed file",
+					})
+				}
+			}
+		}
+	}
+
+	return findings
 }

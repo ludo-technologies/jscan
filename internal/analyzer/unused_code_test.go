@@ -427,8 +427,11 @@ func TestIsEntryPointFile(t *testing.T) {
 		{"/src/index.ts", true},
 		{"/src/index.js", true},
 		{"/src/index.tsx", true},
+		{"/src/main.ts", true},
+		{"/src/app.js", true},
+		{"/src/server.js", true},
 		{"/src/utils.ts", false},
-		{"/src/app.js", false},
+		{"/src/helper.js", false},
 	}
 
 	for _, tc := range tests {
@@ -564,6 +567,458 @@ func TestResolveImportPath_MtsExtension(t *testing.T) {
 	resolved := resolveImportPath("/src/app.ts", "./lib", knownFiles)
 	if resolved != "/src/lib.mts" {
 		t.Errorf("Expected /src/lib.mts, got %q", resolved)
+	}
+}
+
+// --- Orphan Files Tests ---
+
+func TestDetectOrphanFiles_BasicOrphan(t *testing.T) {
+	// A→B→C chain, D is orphan (no one imports it, it imports nothing from the chain)
+	allInfos := map[string]*domain.ModuleInfo{
+		"/src/app.js": {
+			FilePath: "/src/app.js",
+			Imports: []*domain.Import{
+				{
+					Source:     "./utils",
+					SourceType: domain.ModuleTypeRelative,
+					ImportType: domain.ImportTypeNamed,
+					Specifiers: []domain.ImportSpecifier{
+						{Imported: "helper", Local: "helper"},
+					},
+				},
+			},
+		},
+		"/src/utils.js": {
+			FilePath: "/src/utils.js",
+			Imports: []*domain.Import{
+				{
+					Source:     "./lib",
+					SourceType: domain.ModuleTypeRelative,
+					ImportType: domain.ImportTypeNamed,
+					Specifiers: []domain.ImportSpecifier{
+						{Imported: "doStuff", Local: "doStuff"},
+					},
+				},
+			},
+		},
+		"/src/lib.js": {
+			FilePath: "/src/lib.js",
+		},
+		"/src/orphan.js": {
+			FilePath: "/src/orphan.js",
+			Imports: []*domain.Import{
+				{
+					Source:     "./orphan-dep",
+					SourceType: domain.ModuleTypeRelative,
+					ImportType: domain.ImportTypeNamed,
+					Specifiers: []domain.ImportSpecifier{
+						{Imported: "x", Local: "x"},
+					},
+				},
+			},
+		},
+		"/src/orphan-dep.js": {
+			FilePath: "/src/orphan-dep.js",
+		},
+	}
+	analyzedFiles := map[string]bool{
+		"/src/app.js":        true,
+		"/src/utils.js":      true,
+		"/src/lib.js":        true,
+		"/src/orphan.js":     true,
+		"/src/orphan-dep.js": true,
+	}
+
+	findings := DetectOrphanFiles(allInfos, analyzedFiles)
+
+	// app.js is a root (entry point by name), utils.js and lib.js are reachable from app.
+	// orphan.js is also a root (no one imports it), orphan-dep.js is reachable from orphan.
+	// So there should be no orphans (all files are reachable from some root).
+	if len(findings) != 0 {
+		t.Errorf("Expected 0 orphan findings (all reachable from roots), got %d", len(findings))
+		for _, f := range findings {
+			t.Logf("  finding: %s - %s", f.FilePath, f.Description)
+		}
+	}
+}
+
+func TestDetectOrphanFiles_EntryPointNotOrphan(t *testing.T) {
+	allInfos := map[string]*domain.ModuleInfo{
+		"/src/index.js": {
+			FilePath: "/src/index.js",
+		},
+		"/src/main.js": {
+			FilePath: "/src/main.js",
+		},
+		"/src/server.ts": {
+			FilePath: "/src/server.ts",
+		},
+	}
+	analyzedFiles := map[string]bool{
+		"/src/index.js":  true,
+		"/src/main.js":   true,
+		"/src/server.ts": true,
+	}
+
+	findings := DetectOrphanFiles(allInfos, analyzedFiles)
+
+	if len(findings) != 0 {
+		t.Errorf("Expected 0 findings for entry point files, got %d", len(findings))
+		for _, f := range findings {
+			t.Logf("  finding: %s", f.Description)
+		}
+	}
+}
+
+func TestDetectOrphanFiles_TestFileSkipped(t *testing.T) {
+	allInfos := map[string]*domain.ModuleInfo{
+		"/src/index.js": {
+			FilePath: "/src/index.js",
+		},
+		"/src/utils.test.js": {
+			FilePath: "/src/utils.test.js",
+		},
+	}
+	analyzedFiles := map[string]bool{
+		"/src/index.js":      true,
+		"/src/utils.test.js": true,
+	}
+
+	findings := DetectOrphanFiles(allInfos, analyzedFiles)
+
+	if len(findings) != 0 {
+		t.Errorf("Expected 0 findings when only test files are unreachable, got %d", len(findings))
+	}
+}
+
+func TestDetectOrphanFiles_ConfigFileSkipped(t *testing.T) {
+	allInfos := map[string]*domain.ModuleInfo{
+		"/src/index.js": {
+			FilePath: "/src/index.js",
+		},
+		"/jest.config.js": {
+			FilePath: "/jest.config.js",
+		},
+		"/vitest.setup.ts": {
+			FilePath: "/vitest.setup.ts",
+		},
+	}
+	analyzedFiles := map[string]bool{
+		"/src/index.js":    true,
+		"/jest.config.js":  true,
+		"/vitest.setup.ts": true,
+	}
+
+	findings := DetectOrphanFiles(allInfos, analyzedFiles)
+
+	if len(findings) != 0 {
+		t.Errorf("Expected 0 findings for config/setup files, got %d", len(findings))
+		for _, f := range findings {
+			t.Logf("  finding: %s", f.Description)
+		}
+	}
+}
+
+func TestDetectOrphanFiles_AllConnected(t *testing.T) {
+	allInfos := map[string]*domain.ModuleInfo{
+		"/src/index.js": {
+			FilePath: "/src/index.js",
+			Imports: []*domain.Import{
+				{
+					Source:     "./app",
+					SourceType: domain.ModuleTypeRelative,
+					ImportType: domain.ImportTypeDefault,
+					Specifiers: []domain.ImportSpecifier{
+						{Imported: "default", Local: "App"},
+					},
+				},
+			},
+		},
+		"/src/app.js": {
+			FilePath: "/src/app.js",
+			Imports: []*domain.Import{
+				{
+					Source:     "./utils",
+					SourceType: domain.ModuleTypeRelative,
+					ImportType: domain.ImportTypeNamed,
+					Specifiers: []domain.ImportSpecifier{
+						{Imported: "helper", Local: "helper"},
+					},
+				},
+			},
+		},
+		"/src/utils.js": {
+			FilePath: "/src/utils.js",
+		},
+	}
+	analyzedFiles := map[string]bool{
+		"/src/index.js": true,
+		"/src/app.js":   true,
+		"/src/utils.js": true,
+	}
+
+	findings := DetectOrphanFiles(allInfos, analyzedFiles)
+
+	if len(findings) != 0 {
+		t.Errorf("Expected 0 findings when all files are connected, got %d", len(findings))
+	}
+}
+
+func TestDetectOrphanFiles_NilInput(t *testing.T) {
+	findings := DetectOrphanFiles(nil, nil)
+	if findings != nil {
+		t.Errorf("Expected nil findings for nil input, got %d", len(findings))
+	}
+}
+
+// --- Unused Exported Functions Tests ---
+
+func TestDetectUnusedExportedFunctions_UnusedFunction(t *testing.T) {
+	allInfos := map[string]*domain.ModuleInfo{
+		"/src/utils.js": {
+			FilePath: "/src/utils.js",
+			Exports: []*domain.Export{
+				{
+					ExportType:  "declaration",
+					Declaration: "function",
+					Name:        "unusedFunc",
+					Location:    domain.SourceLocation{StartLine: 1, EndLine: 3},
+				},
+			},
+		},
+		"/src/app.js": {
+			FilePath: "/src/app.js",
+			Imports:  []*domain.Import{},
+		},
+	}
+	analyzedFiles := map[string]bool{
+		"/src/utils.js": true,
+		"/src/app.js":   true,
+	}
+
+	findings := DetectUnusedExportedFunctions(allInfos, analyzedFiles)
+
+	if len(findings) != 1 {
+		t.Fatalf("Expected 1 finding for unused exported function, got %d", len(findings))
+	}
+	if findings[0].Reason != ReasonUnusedExportedFunction {
+		t.Errorf("Expected reason %s, got %s", ReasonUnusedExportedFunction, findings[0].Reason)
+	}
+	if findings[0].Severity != SeverityLevelWarning {
+		t.Errorf("Expected severity warning, got %s", findings[0].Severity)
+	}
+}
+
+func TestDetectUnusedExportedFunctions_UsedFunction(t *testing.T) {
+	allInfos := map[string]*domain.ModuleInfo{
+		"/src/utils.js": {
+			FilePath: "/src/utils.js",
+			Exports: []*domain.Export{
+				{
+					ExportType:  "declaration",
+					Declaration: "function",
+					Name:        "usedFunc",
+					Location:    domain.SourceLocation{StartLine: 1, EndLine: 3},
+				},
+			},
+		},
+		"/src/app.js": {
+			FilePath: "/src/app.js",
+			Imports: []*domain.Import{
+				{
+					Source:     "./utils",
+					SourceType: domain.ModuleTypeRelative,
+					ImportType: domain.ImportTypeNamed,
+					Specifiers: []domain.ImportSpecifier{
+						{Imported: "usedFunc", Local: "usedFunc"},
+					},
+				},
+			},
+		},
+	}
+	analyzedFiles := map[string]bool{
+		"/src/utils.js": true,
+		"/src/app.js":   true,
+	}
+
+	findings := DetectUnusedExportedFunctions(allInfos, analyzedFiles)
+
+	if len(findings) != 0 {
+		t.Errorf("Expected 0 findings when exported function is imported, got %d", len(findings))
+	}
+}
+
+func TestDetectUnusedExportedFunctions_ConstNotTargeted(t *testing.T) {
+	allInfos := map[string]*domain.ModuleInfo{
+		"/src/utils.js": {
+			FilePath: "/src/utils.js",
+			Exports: []*domain.Export{
+				{
+					ExportType:  "declaration",
+					Declaration: "const",
+					Name:        "MY_CONST",
+					Location:    domain.SourceLocation{StartLine: 1, EndLine: 1},
+				},
+			},
+		},
+		"/src/app.js": {
+			FilePath: "/src/app.js",
+			Imports:  []*domain.Import{},
+		},
+	}
+	analyzedFiles := map[string]bool{
+		"/src/utils.js": true,
+		"/src/app.js":   true,
+	}
+
+	findings := DetectUnusedExportedFunctions(allInfos, analyzedFiles)
+
+	if len(findings) != 0 {
+		t.Errorf("Expected 0 findings for const export (not function/class), got %d", len(findings))
+	}
+}
+
+func TestDetectUnusedExportedFunctions_EntryPointSkipped(t *testing.T) {
+	allInfos := map[string]*domain.ModuleInfo{
+		"/src/index.js": {
+			FilePath: "/src/index.js",
+			Exports: []*domain.Export{
+				{
+					ExportType:  "declaration",
+					Declaration: "function",
+					Name:        "main",
+					Location:    domain.SourceLocation{StartLine: 1, EndLine: 3},
+				},
+			},
+		},
+	}
+	analyzedFiles := map[string]bool{
+		"/src/index.js": true,
+	}
+
+	findings := DetectUnusedExportedFunctions(allInfos, analyzedFiles)
+
+	if len(findings) != 0 {
+		t.Errorf("Expected 0 findings for entry point file exports, got %d", len(findings))
+	}
+}
+
+func TestDetectUnusedExportedFunctions_TestFileSkipped(t *testing.T) {
+	allInfos := map[string]*domain.ModuleInfo{
+		"/src/utils.test.js": {
+			FilePath: "/src/utils.test.js",
+			Exports: []*domain.Export{
+				{
+					ExportType:  "declaration",
+					Declaration: "function",
+					Name:        "testHelper",
+					Location:    domain.SourceLocation{StartLine: 1, EndLine: 1},
+				},
+			},
+		},
+	}
+	analyzedFiles := map[string]bool{
+		"/src/utils.test.js": true,
+	}
+
+	findings := DetectUnusedExportedFunctions(allInfos, analyzedFiles)
+
+	if len(findings) != 0 {
+		t.Errorf("Expected 0 findings for test file exports, got %d", len(findings))
+	}
+}
+
+func TestDetectUnusedExportedFunctions_DefaultExportFunction(t *testing.T) {
+	allInfos := map[string]*domain.ModuleInfo{
+		"/src/component.js": {
+			FilePath: "/src/component.js",
+			Exports: []*domain.Export{
+				{
+					ExportType:  "default",
+					Declaration: "function",
+					Name:        "MyComponent",
+					Location:    domain.SourceLocation{StartLine: 1, EndLine: 10},
+				},
+			},
+		},
+		"/src/app.js": {
+			FilePath: "/src/app.js",
+			Imports:  []*domain.Import{},
+		},
+	}
+	analyzedFiles := map[string]bool{
+		"/src/component.js": true,
+		"/src/app.js":       true,
+	}
+
+	findings := DetectUnusedExportedFunctions(allInfos, analyzedFiles)
+
+	if len(findings) != 1 {
+		t.Fatalf("Expected 1 finding for unused default export function, got %d", len(findings))
+	}
+	if findings[0].Reason != ReasonUnusedExportedFunction {
+		t.Errorf("Expected reason %s, got %s", ReasonUnusedExportedFunction, findings[0].Reason)
+	}
+}
+
+func TestDetectUnusedExportedFunctions_ClassExport(t *testing.T) {
+	allInfos := map[string]*domain.ModuleInfo{
+		"/src/service.js": {
+			FilePath: "/src/service.js",
+			Exports: []*domain.Export{
+				{
+					ExportType:  "declaration",
+					Declaration: "class",
+					Name:        "UserService",
+					Location:    domain.SourceLocation{StartLine: 1, EndLine: 20},
+				},
+			},
+		},
+		"/src/app.js": {
+			FilePath: "/src/app.js",
+			Imports:  []*domain.Import{},
+		},
+	}
+	analyzedFiles := map[string]bool{
+		"/src/service.js": true,
+		"/src/app.js":     true,
+	}
+
+	findings := DetectUnusedExportedFunctions(allInfos, analyzedFiles)
+
+	if len(findings) != 1 {
+		t.Fatalf("Expected 1 finding for unused exported class, got %d", len(findings))
+	}
+}
+
+func TestDetectUnusedExportedFunctions_NilInput(t *testing.T) {
+	findings := DetectUnusedExportedFunctions(nil, nil)
+	if findings != nil {
+		t.Errorf("Expected nil findings for nil input, got %d", len(findings))
+	}
+}
+
+// --- Config File Helper Tests ---
+
+func TestIsConfigFile(t *testing.T) {
+	tests := []struct {
+		path     string
+		expected bool
+	}{
+		{"/jest.config.js", true},
+		{"/vitest.config.ts", true},
+		{"/vitest.setup.ts", true},
+		{"/src/utils.js", false},
+		{"/src/app.js", false},
+		{"/webpack.config.js", true},
+		{"/babel.config.json", true},
+	}
+
+	for _, tc := range tests {
+		result := isConfigFile(tc.path)
+		if result != tc.expected {
+			t.Errorf("isConfigFile(%q) = %v, want %v", tc.path, result, tc.expected)
+		}
 	}
 }
 

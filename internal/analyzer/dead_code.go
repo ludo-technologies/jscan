@@ -49,6 +49,12 @@ const (
 
 	// ReasonUnusedExport indicates an exported name that is never imported by other files
 	ReasonUnusedExport DeadCodeReason = "unused_export"
+
+	// ReasonOrphanFile indicates a file that is not reachable from any entry point via imports
+	ReasonOrphanFile DeadCodeReason = "orphan_file"
+
+	// ReasonUnusedExportedFunction indicates an exported function/class that is not imported by any other file
+	ReasonUnusedExportedFunction DeadCodeReason = "unused_exported_function"
 )
 
 // DeadCodeFinding represents a single dead code detection result
@@ -230,6 +236,8 @@ func (dcd *DeadCodeDetector) generateDescription(reason DeadCodeReason) string {
 		ReasonUnreachableAfterInfiniteLoop: "Code after infinite loop is unreachable",
 		ReasonUnusedImport:                 "Imported name is never used in this file",
 		ReasonUnusedExport:                 "Exported name is not imported by any other analyzed file",
+		ReasonOrphanFile:                   "File is not imported by any other analyzed file",
+		ReasonUnusedExportedFunction:       "Exported function is not imported by any other analyzed file",
 	}
 
 	if desc, exists := descriptions[reason]; exists {
