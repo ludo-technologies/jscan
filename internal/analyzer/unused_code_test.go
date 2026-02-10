@@ -502,6 +502,71 @@ func TestDetectUnusedExports_DefaultExport(t *testing.T) {
 	}
 }
 
+func TestDetectUnusedImports_ReExportedNotFlagged(t *testing.T) {
+	source := `
+import { foo } from './a';
+export { foo };
+`
+	ast, info := parseAndAnalyze(t, source)
+	findings := DetectUnusedImports(ast, info, "test.js")
+
+	if len(findings) != 0 {
+		t.Errorf("Expected 0 findings when import is re-exported, got %d", len(findings))
+		for _, f := range findings {
+			t.Logf("  finding: %s", f.Description)
+		}
+	}
+}
+
+func TestDetectUnusedImports_ExportDefaultUsesImport(t *testing.T) {
+	source := `
+import { foo } from './a';
+export default foo;
+`
+	ast, info := parseAndAnalyze(t, source)
+	findings := DetectUnusedImports(ast, info, "test.js")
+
+	if len(findings) != 0 {
+		t.Errorf("Expected 0 findings when import is used in export default, got %d", len(findings))
+		for _, f := range findings {
+			t.Logf("  finding: %s", f.Description)
+		}
+	}
+}
+
+func TestResolveImportPath_MjsExtension(t *testing.T) {
+	knownFiles := map[string]bool{
+		"/src/utils.mjs": true,
+	}
+
+	resolved := resolveImportPath("/src/app.js", "./utils", knownFiles)
+	if resolved != "/src/utils.mjs" {
+		t.Errorf("Expected /src/utils.mjs, got %q", resolved)
+	}
+}
+
+func TestResolveImportPath_CtsExtension(t *testing.T) {
+	knownFiles := map[string]bool{
+		"/src/helper.cts": true,
+	}
+
+	resolved := resolveImportPath("/src/app.ts", "./helper", knownFiles)
+	if resolved != "/src/helper.cts" {
+		t.Errorf("Expected /src/helper.cts, got %q", resolved)
+	}
+}
+
+func TestResolveImportPath_MtsExtension(t *testing.T) {
+	knownFiles := map[string]bool{
+		"/src/lib.mts": true,
+	}
+
+	resolved := resolveImportPath("/src/app.ts", "./lib", knownFiles)
+	if resolved != "/src/lib.mts" {
+		t.Errorf("Expected /src/lib.mts, got %q", resolved)
+	}
+}
+
 func TestDetectUnusedExports_NamespaceImportCoversAll(t *testing.T) {
 	allInfos := map[string]*domain.ModuleInfo{
 		"/src/utils.js": {

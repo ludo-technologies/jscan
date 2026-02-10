@@ -58,19 +58,23 @@ func DetectUnusedImports(ast *parser.Node, moduleInfo *domain.ModuleInfo, filePa
 	}
 
 	// Walk the AST and collect all Identifier references,
-	// skipping import/export declaration subtrees
+	// skipping import declaration subtrees (which define the local bindings).
+	// Export declarations are NOT skipped because they reference imported names
+	// (e.g. `export { foo }` or `export default foo` means foo is used).
 	referenced := make(map[string]bool)
 	ast.Walk(func(n *parser.Node) bool {
-		// Skip import/export declaration subtrees entirely
-		switch n.Type {
-		case parser.NodeImportDeclaration,
-			parser.NodeExportNamedDeclaration,
-			parser.NodeExportDefaultDeclaration,
-			parser.NodeExportAllDeclaration:
+		// Skip import declaration subtrees only
+		if n.Type == parser.NodeImportDeclaration {
 			return false
 		}
 
 		if n.Type == parser.NodeIdentifier && n.Name != "" {
+			referenced[n.Name] = true
+		}
+
+		// ExportSpecifier nodes reference local names (e.g. `export { foo }`)
+		// The Name field holds the local identifier being exported
+		if n.Type == parser.NodeExportSpecifier && n.Name != "" {
 			referenced[n.Name] = true
 		}
 
@@ -253,7 +257,7 @@ func resolveImportPath(importingFile, source string, knownFiles map[string]bool)
 	}
 
 	// Try adding extensions
-	extensions := []string{".ts", ".tsx", ".js", ".jsx"}
+	extensions := []string{".ts", ".tsx", ".js", ".jsx", ".mts", ".cts", ".mjs", ".cjs"}
 	for _, ext := range extensions {
 		candidate := resolved + ext
 		if knownFiles[candidate] {
@@ -264,6 +268,7 @@ func resolveImportPath(importingFile, source string, knownFiles map[string]bool)
 	// Try as directory with index files
 	indexFiles := []string{
 		"index.ts", "index.tsx", "index.js", "index.jsx",
+		"index.mts", "index.cts", "index.mjs", "index.cjs",
 	}
 	for _, idx := range indexFiles {
 		candidate := filepath.Join(resolved, idx)
