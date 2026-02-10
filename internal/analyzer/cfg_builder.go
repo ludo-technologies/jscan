@@ -150,11 +150,13 @@ func (b *CFGBuilder) BuildAll(node *parser.Node) (map[string]*CFG, error) {
 		allCFGs[name] = cfg
 	}
 
-	// Track already-discovered function locations to avoid duplicates
+	// Track already-discovered function locations to avoid duplicates.
+	// Scan all blocks (not just Entry) because processStatement may place
+	// function nodes inside control-flow blocks (if_then, loop_body, etc.).
 	discoveredLocations := make(map[string]bool)
 	for _, cfg := range allCFGs {
-		if cfg.Entry != nil {
-			for _, stmt := range cfg.Entry.Statements {
+		for _, block := range cfg.Blocks {
+			for _, stmt := range block.Statements {
 				if stmt.IsFunction() {
 					key := fmt.Sprintf("%d:%d", stmt.Location.StartLine, stmt.Location.StartCol)
 					discoveredLocations[key] = true
@@ -183,9 +185,16 @@ func (b *CFGBuilder) BuildAll(node *parser.Node) (map[string]*CFG, error) {
 		}
 		discoveredLocations[locationKey] = true
 
-		// Already have this name? Make unique
+		// Already have this name? Find a unique suffix
 		if _, exists := allCFGs[funcName]; exists {
-			funcName = fmt.Sprintf("%s_%d", funcName, n.Location.StartLine)
+			base := funcName
+			funcName = fmt.Sprintf("%s_%d", base, n.Location.StartLine)
+			for seq := 2; ; seq++ {
+				if _, exists := allCFGs[funcName]; !exists {
+					break
+				}
+				funcName = fmt.Sprintf("%s_%d_%d", base, n.Location.StartLine, seq)
+			}
 		}
 
 		funcBuilder := NewCFGBuilder()
@@ -284,10 +293,7 @@ func (b *CFGBuilder) processStatement(node *parser.Node) {
 	case parser.NodeFunction, parser.NodeArrowFunction, parser.NodeAsyncFunction,
 		parser.NodeGeneratorFunction, parser.NodeFunctionExpression:
 		// Nested function - build separate CFG
-		funcName := node.Name
-		if funcName == "" {
-			funcName = "anonymous_" + strconv.Itoa(node.Location.StartLine)
-		}
+		funcName := resolveFunctionName(node)
 
 		funcBuilder := NewCFGBuilder()
 		funcCFG, err := funcBuilder.Build(node)
