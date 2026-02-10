@@ -64,6 +64,12 @@ func (b *DependencyGraphBuilder) BuildGraph(moduleResult *domain.ModuleAnalysisR
 		graph.AddNode(node)
 	}
 
+	// Build set of known node IDs for extension resolution
+	knownNodeIDs := make(map[string]bool, len(graph.Nodes))
+	for id := range graph.Nodes {
+		knownNodeIDs[id] = true
+	}
+
 	// Create edges from imports
 	for filePath, moduleInfo := range moduleResult.Files {
 		fromID := b.normalizeModuleID(filePath)
@@ -79,7 +85,7 @@ func (b *DependencyGraphBuilder) BuildGraph(moduleResult *domain.ModuleAnalysisR
 				continue
 			}
 
-			edge := b.createDependencyEdge(fromID, imp, filePath)
+			edge := b.createDependencyEdge(fromID, imp, filePath, knownNodeIDs)
 			if edge != nil {
 				// Ensure target node exists (for external or unresolved modules)
 				toID := edge.To
@@ -165,7 +171,7 @@ func (b *DependencyGraphBuilder) createExternalNode(id, source string, moduleTyp
 }
 
 // createDependencyEdge creates a DependencyEdge from an import
-func (b *DependencyGraphBuilder) createDependencyEdge(fromID string, imp *domain.Import, fromFilePath string) *domain.DependencyEdge {
+func (b *DependencyGraphBuilder) createDependencyEdge(fromID string, imp *domain.Import, fromFilePath string, knownNodeIDs map[string]bool) *domain.DependencyEdge {
 	if imp == nil {
 		return nil
 	}
@@ -174,7 +180,7 @@ func (b *DependencyGraphBuilder) createDependencyEdge(fromID string, imp *domain
 	edgeType := b.getEdgeType(imp)
 
 	// Resolve target module ID
-	toID := b.resolveImportTarget(imp.Source, imp.SourceType, fromFilePath)
+	toID := b.resolveImportTarget(imp.Source, imp.SourceType, fromFilePath, knownNodeIDs)
 
 	// Extract specifier names
 	var specifiers []string
@@ -210,7 +216,7 @@ func (b *DependencyGraphBuilder) getEdgeType(imp *domain.Import) domain.Dependen
 }
 
 // resolveImportTarget resolves an import source to a target module ID
-func (b *DependencyGraphBuilder) resolveImportTarget(source string, sourceType domain.ModuleType, fromFilePath string) string {
+func (b *DependencyGraphBuilder) resolveImportTarget(source string, sourceType domain.ModuleType, fromFilePath string, knownNodeIDs map[string]bool) string {
 	switch sourceType {
 	case domain.ModuleTypeRelative:
 		// Resolve relative path from the importing file
@@ -218,7 +224,32 @@ func (b *DependencyGraphBuilder) resolveImportTarget(source string, sourceType d
 		resolved := filepath.Join(dir, source)
 		// Normalize the path
 		resolved = filepath.Clean(resolved)
-		return b.normalizeModuleID(resolved)
+		normalized := b.normalizeModuleID(resolved)
+
+		// If the normalized ID matches a known node, return it directly
+		if knownNodeIDs[normalized] {
+			return normalized
+		}
+
+		// Try appending common extensions
+		extensions := []string{".ts", ".tsx", ".js", ".jsx", ".mts", ".cts", ".mjs", ".cjs"}
+		for _, ext := range extensions {
+			candidate := normalized + ext
+			if knownNodeIDs[candidate] {
+				return candidate
+			}
+		}
+
+		// Try directory index files
+		for _, ext := range extensions {
+			candidate := normalized + "/index" + ext
+			if knownNodeIDs[candidate] {
+				return candidate
+			}
+		}
+
+		// No match found; return normalized as-is (will become external)
+		return normalized
 
 	case domain.ModuleTypePackage, domain.ModuleTypeBuiltin:
 		// Use the source as-is for packages and builtins
