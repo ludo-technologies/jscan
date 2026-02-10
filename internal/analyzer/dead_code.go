@@ -43,6 +43,12 @@ const (
 
 	// ReasonUnreachableAfterInfiniteLoop indicates code after an infinite loop
 	ReasonUnreachableAfterInfiniteLoop DeadCodeReason = "unreachable_after_infinite_loop"
+
+	// ReasonUnusedImport indicates an imported name that is never referenced
+	ReasonUnusedImport DeadCodeReason = "unused_import"
+
+	// ReasonUnusedExport indicates an exported name that is never imported by other files
+	ReasonUnusedExport DeadCodeReason = "unused_export"
 )
 
 // DeadCodeFinding represents a single dead code detection result
@@ -222,6 +228,8 @@ func (dcd *DeadCodeDetector) generateDescription(reason DeadCodeReason) string {
 		ReasonUnreachableAfterThrow:        "Code after throw statement is unreachable",
 		ReasonUnreachableBranch:            "This branch is unreachable",
 		ReasonUnreachableAfterInfiniteLoop: "Code after infinite loop is unreachable",
+		ReasonUnusedImport:                 "Imported name is never used in this file",
+		ReasonUnusedExport:                 "Exported name is not imported by any other analyzed file",
 	}
 
 	if desc, exists := descriptions[reason]; exists {
