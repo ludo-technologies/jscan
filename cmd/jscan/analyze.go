@@ -258,7 +258,7 @@ func runAnalyze(cmd *cobra.Command, args []string) error {
 
 		// Get absolute path for display
 		absPath, _ := filepath.Abs(htmlPath)
-		fmt.Printf("HTML report saved to: %s\n", absPath)
+		fmt.Printf("\U0001F4CA Unified HTML report generated and opened: %s\n", absPath)
 
 		// Open in browser unless disabled
 		if !noOpenBrowser && !service.IsSSH() {
@@ -266,6 +266,10 @@ func runAnalyze(cmd *cobra.Command, args []string) error {
 				fmt.Fprintf(os.Stderr, "Warning: Could not open browser: %v\n", err)
 			}
 		}
+
+		// Print CLI summary
+		summary := service.BuildAnalyzeSummary(complexityResponse, deadCodeResponse, cloneResponse, cboResponse, depsResponse)
+		fmt.Print(service.FormatCLISummary(summary, duration))
 
 		return nil
 	}

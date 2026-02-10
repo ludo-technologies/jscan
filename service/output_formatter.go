@@ -7,6 +7,7 @@ import (
 	"io"
 	"sort"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/ludo-technologies/jscan/domain"
@@ -188,6 +189,126 @@ func (f *OutputFormatterImpl) writeDeadCodeJSON(response *domain.DeadCodeRespons
 	return WriteJSON(writer, jsonResponse)
 }
 
+// BuildAnalyzeSummary builds an AnalyzeSummary from analysis responses
+func BuildAnalyzeSummary(
+	complexityResponse *domain.ComplexityResponse,
+	deadCodeResponse *domain.DeadCodeResponse,
+	cloneResponse *domain.CloneResponse,
+	cboResponse *domain.CBOResponse,
+	depsResponse *domain.DependencyGraphResponse,
+) *domain.AnalyzeSummary {
+	summary := &domain.AnalyzeSummary{}
+
+	if complexityResponse != nil {
+		summary.ComplexityEnabled = true
+		summary.TotalFunctions = complexityResponse.Summary.TotalFunctions
+		summary.AverageComplexity = complexityResponse.Summary.AverageComplexity
+		summary.HighComplexityCount = complexityResponse.Summary.HighRiskFunctions
+		summary.AnalyzedFiles = complexityResponse.Summary.FilesAnalyzed
+	}
+
+	if deadCodeResponse != nil {
+		summary.DeadCodeEnabled = true
+		summary.DeadCodeCount = deadCodeResponse.Summary.TotalFindings
+		summary.CriticalDeadCode = deadCodeResponse.Summary.CriticalFindings
+		summary.WarningDeadCode = deadCodeResponse.Summary.WarningFindings
+		summary.InfoDeadCode = deadCodeResponse.Summary.InfoFindings
+		if deadCodeResponse.Summary.TotalFiles > summary.TotalFiles {
+			summary.TotalFiles = deadCodeResponse.Summary.TotalFiles
+		}
+	}
+
+	if cloneResponse != nil {
+		summary.CloneEnabled = true
+		if cloneResponse.Statistics != nil {
+			summary.TotalClones = cloneResponse.Statistics.TotalClones
+			summary.ClonePairs = cloneResponse.Statistics.TotalClonePairs
+			summary.CloneGroups = cloneResponse.Statistics.TotalCloneGroups
+			summary.CodeDuplication = calculateDuplicationPercentage(cloneResponse)
+		}
+	}
+
+	if cboResponse != nil {
+		summary.CBOEnabled = true
+		summary.CBOClasses = cboResponse.Summary.TotalClasses
+		summary.HighCouplingClasses = cboResponse.Summary.HighRiskClasses
+		summary.MediumCouplingClasses = cboResponse.Summary.MediumRiskClasses
+		summary.AverageCoupling = cboResponse.Summary.AverageCBO
+	}
+
+	if depsResponse != nil {
+		summary.DepsEnabled = true
+		if depsResponse.Graph != nil {
+			summary.DepsTotalModules = depsResponse.Graph.NodeCount()
+		}
+		if depsResponse.Analysis != nil {
+			if depsResponse.Analysis.CircularDependencies != nil {
+				summary.DepsModulesInCycles = depsResponse.Analysis.CircularDependencies.TotalModulesInCycles
+			}
+			summary.DepsMaxDepth = depsResponse.Analysis.MaxDepth
+		}
+	}
+
+	_ = summary.CalculateHealthScore()
+	return summary
+}
+
+// FormatCLISummary formats an AnalyzeSummary as a compact CLI string (pyscn-style)
+func FormatCLISummary(summary *domain.AnalyzeSummary, duration time.Duration) string {
+	var b fmt.Stringer = &strings.Builder{}
+	w := b.(*strings.Builder)
+
+	fmt.Fprintf(w, "\n\U0001F4CA Analysis Summary:\n")
+	fmt.Fprintf(w, "Health Score: %d/100 (Grade: %s)\n", summary.HealthScore, summary.Grade)
+	fmt.Fprintf(w, "Total time: %dms\n", duration.Milliseconds())
+
+	fmt.Fprintf(w, "\n\U0001F4C8 Detailed Scores:\n")
+
+	if summary.ComplexityEnabled {
+		fmt.Fprintf(w, "  Complexity:      %3d/100 %s  (avg: %.1f, high-risk: %d functions)\n",
+			summary.ComplexityScore, scoreIndicator(summary.ComplexityScore),
+			summary.AverageComplexity, summary.HighComplexityCount)
+	}
+	if summary.DeadCodeEnabled {
+		fmt.Fprintf(w, "  Dead Code:       %3d/100 %s  (%d issues, %d critical)\n",
+			summary.DeadCodeScore, scoreIndicator(summary.DeadCodeScore),
+			summary.DeadCodeCount, summary.CriticalDeadCode)
+	}
+	if summary.CloneEnabled {
+		fmt.Fprintf(w, "  Duplication:     %3d/100 %s  (%.1f%% duplication, %d groups)\n",
+			summary.DuplicationScore, scoreIndicator(summary.DuplicationScore),
+			summary.CodeDuplication, summary.CloneGroups)
+	}
+	if summary.CBOEnabled {
+		fmt.Fprintf(w, "  Coupling (CBO):  %3d/100 %s  (avg: %.1f, %d/%d high-coupling)\n",
+			summary.CouplingScore, scoreIndicator(summary.CouplingScore),
+			summary.AverageCoupling, summary.HighCouplingClasses, summary.CBOClasses)
+	}
+	if summary.DepsEnabled {
+		cycles := 0
+		if summary.DepsModulesInCycles > 0 {
+			cycles = summary.DepsModulesInCycles
+		}
+		fmt.Fprintf(w, "  Dependencies:    %3d/100 %s  (%d cycles, depth: %d)\n",
+			summary.DependencyScore, scoreIndicator(summary.DependencyScore),
+			cycles, summary.DepsMaxDepth)
+	}
+
+	return w.String()
+}
+
+// scoreIndicator returns a status emoji based on the score
+func scoreIndicator(score int) string {
+	switch {
+	case score >= domain.ScoreThresholdExcellent:
+		return "\u2705" // ✅
+	case score >= domain.ScoreThresholdFair:
+		return "\u26A0\uFE0F" // ⚠️
+	default:
+		return "\u274C" // ❌
+	}
+}
+
 // writeAnalyzeJSON writes unified analysis response as JSON
 func (f *OutputFormatterImpl) writeAnalyzeJSON(
 	complexityResponse *domain.ComplexityResponse,
@@ -206,10 +327,7 @@ func (f *OutputFormatterImpl) writeAnalyzeJSON(
 		DurationMs:  duration.Milliseconds(),
 	}
 
-	// Build summary
-	summary := &domain.AnalyzeSummary{}
-
-	// Add complexity data if available
+	// Add individual response data
 	if complexityResponse != nil {
 		response.Complexity = &ComplexityResponseJSON{
 			Version:     version.Version,
@@ -220,14 +338,7 @@ func (f *OutputFormatterImpl) writeAnalyzeJSON(
 			Errors:      complexityResponse.Errors,
 			Config:      complexityResponse.Config,
 		}
-		summary.ComplexityEnabled = true
-		summary.TotalFunctions = complexityResponse.Summary.TotalFunctions
-		summary.AverageComplexity = complexityResponse.Summary.AverageComplexity
-		summary.HighComplexityCount = complexityResponse.Summary.HighRiskFunctions
-		summary.AnalyzedFiles = complexityResponse.Summary.FilesAnalyzed
 	}
-
-	// Add dead code data if available
 	if deadCodeResponse != nil {
 		response.DeadCode = &DeadCodeResponseJSON{
 			Version:     version.Version,
@@ -238,17 +349,7 @@ func (f *OutputFormatterImpl) writeAnalyzeJSON(
 			Errors:      deadCodeResponse.Errors,
 			Config:      deadCodeResponse.Config,
 		}
-		summary.DeadCodeEnabled = true
-		summary.DeadCodeCount = deadCodeResponse.Summary.TotalFindings
-		summary.CriticalDeadCode = deadCodeResponse.Summary.CriticalFindings
-		summary.WarningDeadCode = deadCodeResponse.Summary.WarningFindings
-		summary.InfoDeadCode = deadCodeResponse.Summary.InfoFindings
-		if deadCodeResponse.Summary.TotalFiles > summary.TotalFiles {
-			summary.TotalFiles = deadCodeResponse.Summary.TotalFiles
-		}
 	}
-
-	// Add clone data if available
 	if cloneResponse != nil {
 		response.Clone = &CloneResponseJSON{
 			Version:     version.Version,
@@ -260,17 +361,7 @@ func (f *OutputFormatterImpl) writeAnalyzeJSON(
 			Success:     cloneResponse.Success,
 			Error:       cloneResponse.Error,
 		}
-		summary.CloneEnabled = true
-		if cloneResponse.Statistics != nil {
-			summary.TotalClones = cloneResponse.Statistics.TotalClones
-			summary.ClonePairs = cloneResponse.Statistics.TotalClonePairs
-			summary.CloneGroups = cloneResponse.Statistics.TotalCloneGroups
-			// Calculate code duplication percentage
-			summary.CodeDuplication = calculateDuplicationPercentage(cloneResponse)
-		}
 	}
-
-	// Add CBO data if available
 	if cboResponse != nil {
 		response.CBO = &CBOResponseJSON{
 			Version:     version.Version,
@@ -281,14 +372,7 @@ func (f *OutputFormatterImpl) writeAnalyzeJSON(
 			Errors:      cboResponse.Errors,
 			Config:      cboResponse.Config,
 		}
-		summary.CBOEnabled = true
-		summary.CBOClasses = cboResponse.Summary.TotalClasses
-		summary.HighCouplingClasses = cboResponse.Summary.HighRiskClasses
-		summary.MediumCouplingClasses = cboResponse.Summary.MediumRiskClasses
-		summary.AverageCoupling = cboResponse.Summary.AverageCBO
 	}
-
-	// Add deps data if available
 	if depsResponse != nil {
 		response.Deps = &DepsResponseJSON{
 			Version:     version.Version,
@@ -298,20 +382,9 @@ func (f *OutputFormatterImpl) writeAnalyzeJSON(
 			Warnings:    depsResponse.Warnings,
 			Errors:      depsResponse.Errors,
 		}
-		summary.DepsEnabled = true
-		if depsResponse.Graph != nil {
-			summary.DepsTotalModules = depsResponse.Graph.NodeCount()
-		}
-		if depsResponse.Analysis != nil {
-			if depsResponse.Analysis.CircularDependencies != nil {
-				summary.DepsModulesInCycles = depsResponse.Analysis.CircularDependencies.TotalModulesInCycles
-			}
-			summary.DepsMaxDepth = depsResponse.Analysis.MaxDepth
-		}
 	}
 
-	// Calculate health score
-	_ = summary.CalculateHealthScore()
+	summary := BuildAnalyzeSummary(complexityResponse, deadCodeResponse, cloneResponse, cboResponse, depsResponse)
 	response.Summary = summary
 
 	return WriteJSON(writer, response)
@@ -536,60 +609,7 @@ func (f *OutputFormatterImpl) writeAnalyzeText(
 		}
 	}
 
-	// Build summary and calculate health score (mirrors writeAnalyzeJSON logic)
-	summary := &domain.AnalyzeSummary{}
-
-	if complexityResponse != nil {
-		summary.ComplexityEnabled = true
-		summary.TotalFunctions = complexityResponse.Summary.TotalFunctions
-		summary.AverageComplexity = complexityResponse.Summary.AverageComplexity
-		summary.HighComplexityCount = complexityResponse.Summary.HighRiskFunctions
-		summary.AnalyzedFiles = complexityResponse.Summary.FilesAnalyzed
-	}
-
-	if deadCodeResponse != nil {
-		summary.DeadCodeEnabled = true
-		summary.DeadCodeCount = deadCodeResponse.Summary.TotalFindings
-		summary.CriticalDeadCode = deadCodeResponse.Summary.CriticalFindings
-		summary.WarningDeadCode = deadCodeResponse.Summary.WarningFindings
-		summary.InfoDeadCode = deadCodeResponse.Summary.InfoFindings
-		if deadCodeResponse.Summary.TotalFiles > summary.TotalFiles {
-			summary.TotalFiles = deadCodeResponse.Summary.TotalFiles
-		}
-	}
-
-	if cloneResponse != nil {
-		summary.CloneEnabled = true
-		if cloneResponse.Statistics != nil {
-			summary.TotalClones = cloneResponse.Statistics.TotalClones
-			summary.ClonePairs = cloneResponse.Statistics.TotalClonePairs
-			summary.CloneGroups = cloneResponse.Statistics.TotalCloneGroups
-			summary.CodeDuplication = calculateDuplicationPercentage(cloneResponse)
-		}
-	}
-
-	if cboResponse != nil {
-		summary.CBOEnabled = true
-		summary.CBOClasses = cboResponse.Summary.TotalClasses
-		summary.HighCouplingClasses = cboResponse.Summary.HighRiskClasses
-		summary.MediumCouplingClasses = cboResponse.Summary.MediumRiskClasses
-		summary.AverageCoupling = cboResponse.Summary.AverageCBO
-	}
-
-	if depsResponse != nil {
-		summary.DepsEnabled = true
-		if depsResponse.Graph != nil {
-			summary.DepsTotalModules = depsResponse.Graph.NodeCount()
-		}
-		if depsResponse.Analysis != nil {
-			if depsResponse.Analysis.CircularDependencies != nil {
-				summary.DepsModulesInCycles = depsResponse.Analysis.CircularDependencies.TotalModulesInCycles
-			}
-			summary.DepsMaxDepth = depsResponse.Analysis.MaxDepth
-		}
-	}
-
-	_ = summary.CalculateHealthScore()
+	summary := BuildAnalyzeSummary(complexityResponse, deadCodeResponse, cloneResponse, cboResponse, depsResponse)
 
 	// Write Health Score section
 	fmt.Fprintf(writer, "\n=== Health Score ===\n\n")
@@ -737,10 +757,6 @@ func (f *OutputFormatterImpl) writeAnalyzeYAML(
 		DurationMs:  duration.Milliseconds(),
 	}
 
-	// Build summary
-	summary := &domain.AnalyzeSummary{}
-
-	// Add complexity data if available
 	if complexityResponse != nil {
 		response.Complexity = &ComplexityResponseJSON{
 			Version:     version.Version,
@@ -751,14 +767,7 @@ func (f *OutputFormatterImpl) writeAnalyzeYAML(
 			Errors:      complexityResponse.Errors,
 			Config:      complexityResponse.Config,
 		}
-		summary.ComplexityEnabled = true
-		summary.TotalFunctions = complexityResponse.Summary.TotalFunctions
-		summary.AverageComplexity = complexityResponse.Summary.AverageComplexity
-		summary.HighComplexityCount = complexityResponse.Summary.HighRiskFunctions
-		summary.AnalyzedFiles = complexityResponse.Summary.FilesAnalyzed
 	}
-
-	// Add dead code data if available
 	if deadCodeResponse != nil {
 		response.DeadCode = &DeadCodeResponseJSON{
 			Version:     version.Version,
@@ -769,17 +778,7 @@ func (f *OutputFormatterImpl) writeAnalyzeYAML(
 			Errors:      deadCodeResponse.Errors,
 			Config:      deadCodeResponse.Config,
 		}
-		summary.DeadCodeEnabled = true
-		summary.DeadCodeCount = deadCodeResponse.Summary.TotalFindings
-		summary.CriticalDeadCode = deadCodeResponse.Summary.CriticalFindings
-		summary.WarningDeadCode = deadCodeResponse.Summary.WarningFindings
-		summary.InfoDeadCode = deadCodeResponse.Summary.InfoFindings
-		if deadCodeResponse.Summary.TotalFiles > summary.TotalFiles {
-			summary.TotalFiles = deadCodeResponse.Summary.TotalFiles
-		}
 	}
-
-	// Add clone data if available
 	if cloneResponse != nil {
 		response.Clone = &CloneResponseJSON{
 			Version:     version.Version,
@@ -791,16 +790,7 @@ func (f *OutputFormatterImpl) writeAnalyzeYAML(
 			Success:     cloneResponse.Success,
 			Error:       cloneResponse.Error,
 		}
-		summary.CloneEnabled = true
-		if cloneResponse.Statistics != nil {
-			summary.TotalClones = cloneResponse.Statistics.TotalClones
-			summary.ClonePairs = cloneResponse.Statistics.TotalClonePairs
-			summary.CloneGroups = cloneResponse.Statistics.TotalCloneGroups
-			summary.CodeDuplication = calculateDuplicationPercentage(cloneResponse)
-		}
 	}
-
-	// Add CBO data if available
 	if cboResponse != nil {
 		response.CBO = &CBOResponseJSON{
 			Version:     version.Version,
@@ -811,14 +801,7 @@ func (f *OutputFormatterImpl) writeAnalyzeYAML(
 			Errors:      cboResponse.Errors,
 			Config:      cboResponse.Config,
 		}
-		summary.CBOEnabled = true
-		summary.CBOClasses = cboResponse.Summary.TotalClasses
-		summary.HighCouplingClasses = cboResponse.Summary.HighRiskClasses
-		summary.MediumCouplingClasses = cboResponse.Summary.MediumRiskClasses
-		summary.AverageCoupling = cboResponse.Summary.AverageCBO
 	}
-
-	// Add deps data if available
 	if depsResponse != nil {
 		response.Deps = &DepsResponseJSON{
 			Version:     version.Version,
@@ -828,20 +811,9 @@ func (f *OutputFormatterImpl) writeAnalyzeYAML(
 			Warnings:    depsResponse.Warnings,
 			Errors:      depsResponse.Errors,
 		}
-		summary.DepsEnabled = true
-		if depsResponse.Graph != nil {
-			summary.DepsTotalModules = depsResponse.Graph.NodeCount()
-		}
-		if depsResponse.Analysis != nil {
-			if depsResponse.Analysis.CircularDependencies != nil {
-				summary.DepsModulesInCycles = depsResponse.Analysis.CircularDependencies.TotalModulesInCycles
-			}
-			summary.DepsMaxDepth = depsResponse.Analysis.MaxDepth
-		}
 	}
 
-	// Calculate health score
-	_ = summary.CalculateHealthScore()
+	summary := BuildAnalyzeSummary(complexityResponse, deadCodeResponse, cloneResponse, cboResponse, depsResponse)
 	response.Summary = summary
 
 	// Write YAML
