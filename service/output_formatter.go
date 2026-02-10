@@ -255,8 +255,7 @@ func BuildAnalyzeSummary(
 
 // FormatCLISummary formats an AnalyzeSummary as a compact CLI string (pyscn-style)
 func FormatCLISummary(summary *domain.AnalyzeSummary, duration time.Duration) string {
-	var b fmt.Stringer = &strings.Builder{}
-	w := b.(*strings.Builder)
+	w := &strings.Builder{}
 
 	fmt.Fprintf(w, "\n\U0001F4CA Analysis Summary:\n")
 	fmt.Fprintf(w, "Health Score: %d/100 (Grade: %s)\n", summary.HealthScore, summary.Grade)
@@ -297,10 +296,11 @@ func FormatCLISummary(summary *domain.AnalyzeSummary, duration time.Duration) st
 	return w.String()
 }
 
-// scoreIndicator returns a status emoji based on the score
+// scoreIndicator returns a status emoji based on the score.
+// Thresholds align with grade boundaries: ✅ A/B (>=75), ⚠️ C (>=60), ❌ D/F (<60)
 func scoreIndicator(score int) string {
 	switch {
-	case score >= domain.ScoreThresholdExcellent:
+	case score >= domain.ScoreThresholdGood:
 		return "\u2705" // ✅
 	case score >= domain.ScoreThresholdFair:
 		return "\u26A0\uFE0F" // ⚠️

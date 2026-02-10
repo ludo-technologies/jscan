@@ -274,8 +274,20 @@ func runAnalyze(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
-	// JSON or Text output to stdout
-	return formatter.WriteAnalyze(complexityResponse, deadCodeResponse, cloneResponse, cboResponse, depsResponse, format, os.Stdout, duration)
+	// JSON, Text, or other format output to stdout
+	if err := formatter.WriteAnalyze(complexityResponse, deadCodeResponse, cloneResponse, cboResponse, depsResponse, format, os.Stdout, duration); err != nil {
+		return err
+	}
+
+	// Print CLI summary to stderr for structured formats (JSON/YAML/CSV)
+	// so it doesn't pollute the machine-readable output on stdout.
+	// Text format already includes a Health Score section, so skip it.
+	if format != domain.OutputFormatText {
+		summary := service.BuildAnalyzeSummary(complexityResponse, deadCodeResponse, cloneResponse, cboResponse, depsResponse)
+		fmt.Fprint(os.Stderr, service.FormatCLISummary(summary, duration))
+	}
+
+	return nil
 }
 
 // runComplexityAnalysisInternal runs complexity analysis on the given files without progress tracking
