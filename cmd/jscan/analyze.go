@@ -437,9 +437,52 @@ func runDeadCodeAnalysisWithTask(files []string, task domain.TaskProgress) (*dom
 		}
 	}
 
-	// Post-step: Detect unused exports (cross-file)
+	// Post-step: Detect unused exported functions (cross-file, warning severity)
+	unusedFuncFindings := analyzer.DetectUnusedExportedFunctions(allModuleInfos, analyzedFiles)
+	// Build dedup set so DetectUnusedExports won't double-report the same export
+	unusedFuncDedup := make(map[string]map[int]bool) // filePath → startLine → true
+	for _, finding := range unusedFuncFindings {
+		f := domain.DeadCodeFinding{
+			Location: domain.DeadCodeLocation{
+				FilePath:  finding.FilePath,
+				StartLine: finding.StartLine,
+				EndLine:   finding.EndLine,
+			},
+			Reason:      string(finding.Reason),
+			Severity:    domain.DeadCodeSeverity(finding.Severity),
+			Description: finding.Description,
+		}
+
+		if idx, ok := fileIndexMap[finding.FilePath]; ok {
+			allFiles[idx].FileLevelFindings = append(allFiles[idx].FileLevelFindings, f)
+			allFiles[idx].TotalFindings++
+		} else {
+			fileDeadCode := domain.FileDeadCode{
+				FilePath:          finding.FilePath,
+				FileLevelFindings: []domain.DeadCodeFinding{f},
+				TotalFindings:     1,
+			}
+			fileIndexMap[finding.FilePath] = len(allFiles)
+			allFiles = append(allFiles, fileDeadCode)
+		}
+
+		if unusedFuncDedup[finding.FilePath] == nil {
+			unusedFuncDedup[finding.FilePath] = make(map[int]bool)
+		}
+		unusedFuncDedup[finding.FilePath][finding.StartLine] = true
+
+		warningFindings++
+		totalFindings++
+	}
+
+	// Post-step: Detect unused exports (cross-file, info severity)
 	unusedExports := analyzer.DetectUnusedExports(allModuleInfos, analyzedFiles)
 	for _, finding := range unusedExports {
+		// Skip exports already reported as unused exported functions
+		if lines, ok := unusedFuncDedup[finding.FilePath]; ok && lines[finding.StartLine] {
+			continue
+		}
+
 		f := domain.DeadCodeFinding{
 			Location: domain.DeadCodeLocation{
 				FilePath:  finding.FilePath,
@@ -466,6 +509,35 @@ func runDeadCodeAnalysisWithTask(files []string, task domain.TaskProgress) (*dom
 		}
 
 		infoFindings++
+		totalFindings++
+	}
+
+	// Post-step: Detect orphan files (cross-file)
+	orphanFindings := analyzer.DetectOrphanFiles(allModuleInfos, analyzedFiles)
+	for _, finding := range orphanFindings {
+		f := domain.DeadCodeFinding{
+			Location: domain.DeadCodeLocation{
+				FilePath: finding.FilePath,
+			},
+			Reason:      string(finding.Reason),
+			Severity:    domain.DeadCodeSeverity(finding.Severity),
+			Description: finding.Description,
+		}
+
+		if idx, ok := fileIndexMap[finding.FilePath]; ok {
+			allFiles[idx].FileLevelFindings = append(allFiles[idx].FileLevelFindings, f)
+			allFiles[idx].TotalFindings++
+		} else {
+			fileDeadCode := domain.FileDeadCode{
+				FilePath:          finding.FilePath,
+				FileLevelFindings: []domain.DeadCodeFinding{f},
+				TotalFindings:     1,
+			}
+			fileIndexMap[finding.FilePath] = len(allFiles)
+			allFiles = append(allFiles, fileDeadCode)
+		}
+
+		warningFindings++
 		totalFindings++
 	}
 

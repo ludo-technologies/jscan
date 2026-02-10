@@ -206,10 +206,11 @@ func (s *AnalyzeSummary) calculateComplexityPenalty() int {
 }
 
 // calculateDeadCodePenalty calculates the penalty for dead code (max 20)
-// Uses weighted counting: Critical=1.0, Warning=0.5, Info=0.2
-func (s *AnalyzeSummary) calculateDeadCodePenalty(normalizationFactor float64) int {
-	// Calculate weighted dead code count
-	// Critical issues have full weight, warning half, info minimal
+// Uses per-file rate of weighted findings so that large repos are not unfairly penalized.
+// Weights: Critical=1.0, Warning=0.5, Info=0.2
+// The rate (weightedFindings / totalFiles) is mapped linearly to 0–20,
+// reaching the maximum penalty at a rate of 3.0 findings per file.
+func (s *AnalyzeSummary) calculateDeadCodePenalty(_ float64) int {
 	weightedDeadCode := float64(s.CriticalDeadCode)*1.0 +
 		float64(s.WarningDeadCode)*0.5 +
 		float64(s.InfoDeadCode)*0.2
@@ -218,8 +219,22 @@ func (s *AnalyzeSummary) calculateDeadCodePenalty(normalizationFactor float64) i
 		return 0
 	}
 
-	penalty := int(math.Round(math.Min(float64(MaxDeadCodePenalty), weightedDeadCode/normalizationFactor)))
-	return penalty
+	files := s.TotalFiles
+	if files < 1 {
+		files = 1
+	}
+
+	// Per-file rate: how many weighted findings per file
+	rate := weightedDeadCode / float64(files)
+
+	// Linear mapping: rate 0 → penalty 0, rate 3.0 → penalty 20 (max)
+	const maxRate = 3.0
+	penalty := rate / maxRate * float64(MaxDeadCodePenalty)
+	if penalty > float64(MaxDeadCodePenalty) {
+		penalty = float64(MaxDeadCodePenalty)
+	}
+
+	return int(math.Round(penalty))
 }
 
 // calculateDuplicationPenalty calculates the penalty for code duplication (max 20)
