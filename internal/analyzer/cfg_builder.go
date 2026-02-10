@@ -121,6 +121,15 @@ func (b *CFGBuilder) Build(node *parser.Node) (*CFG, error) {
 	return b.cfg, nil
 }
 
+// resolveFunctionName returns the name of a function node, or a generated name
+// based on its source location if it is anonymous.
+func resolveFunctionName(node *parser.Node) string {
+	if node.Name != "" {
+		return node.Name
+	}
+	return fmt.Sprintf("anonymous_%d", node.Location.StartLine)
+}
+
 // BuildAll builds CFGs for all functions in the AST
 func (b *CFGBuilder) BuildAll(node *parser.Node) (map[string]*CFG, error) {
 	if node == nil {
@@ -136,36 +145,62 @@ func (b *CFGBuilder) BuildAll(node *parser.Node) (map[string]*CFG, error) {
 	}
 	allCFGs["__main__"] = mainCFG
 
-	// Add all function CFGs (including nested ones)
+	// Add all function CFGs discovered during Build (via processStatement)
 	for name, cfg := range b.functionCFGs {
 		allCFGs[name] = cfg
 	}
 
-	// Also process top-level functions directly
-	if node.Type == parser.NodeProgram {
-		for _, stmt := range node.Body {
-			if stmt.IsFunction() {
-				funcName := stmt.Name
-				if funcName == "" {
-					funcName = "anonymous_" + strconv.Itoa(stmt.Location.StartLine)
-				}
-
-				// Check if we already have this function
-				if _, exists := allCFGs[funcName]; !exists {
-					funcBuilder := NewCFGBuilder()
-					funcCFG, err := funcBuilder.Build(stmt)
-					if err == nil {
-						allCFGs[funcName] = funcCFG
-						// Add nested functions from this function
-						for nestedName, nestedCFG := range funcBuilder.functionCFGs {
-							fullName := funcName + "." + nestedName
-							allCFGs[fullName] = nestedCFG
-						}
-					}
+	// Track already-discovered function locations to avoid duplicates
+	discoveredLocations := make(map[string]bool)
+	for _, cfg := range allCFGs {
+		if cfg.Entry != nil {
+			for _, stmt := range cfg.Entry.Statements {
+				if stmt.IsFunction() {
+					key := fmt.Sprintf("%d:%d", stmt.Location.StartLine, stmt.Location.StartCol)
+					discoveredLocations[key] = true
 				}
 			}
 		}
 	}
+
+	// Discover functions nested inside expressions (variable declarations,
+	// assignments, callbacks, object methods, etc.) that processStatement
+	// doesn't reach.
+	node.Walk(func(n *parser.Node) bool {
+		if n == node {
+			return true
+		}
+		if !n.IsFunction() {
+			return true
+		}
+
+		funcName := resolveFunctionName(n)
+
+		// Skip if already discovered
+		locationKey := fmt.Sprintf("%d:%d", n.Location.StartLine, n.Location.StartCol)
+		if discoveredLocations[locationKey] {
+			return true
+		}
+		discoveredLocations[locationKey] = true
+
+		// Already have this name? Make unique
+		if _, exists := allCFGs[funcName]; exists {
+			funcName = fmt.Sprintf("%s_%d", funcName, n.Location.StartLine)
+		}
+
+		funcBuilder := NewCFGBuilder()
+		funcCFG, err := funcBuilder.Build(n)
+		if err == nil {
+			allCFGs[funcName] = funcCFG
+			// Also discover nested functions from this builder
+			for nestedName, nestedCFG := range funcBuilder.functionCFGs {
+				if _, exists := allCFGs[nestedName]; !exists {
+					allCFGs[nestedName] = nestedCFG
+				}
+			}
+		}
+		return false // Don't descend into this function's body (Build handles it)
+	})
 
 	return allCFGs, nil
 }
