@@ -311,6 +311,13 @@ func isTestFile(filePath string) bool {
 	return false
 }
 
+// isFunctionOrClassDeclaration checks if a declaration string represents
+// a function or class. The parser stores AST node types like
+// "FunctionDeclaration", "AsyncFunctionDeclaration", "ClassDeclaration".
+func isFunctionOrClassDeclaration(decl string) bool {
+	return strings.Contains(decl, "Function") || strings.Contains(decl, "Class")
+}
+
 // isConfigFile checks if a file is a configuration or setup file.
 func isConfigFile(filePath string) bool {
 	base := filepath.Base(filePath)
@@ -494,12 +501,11 @@ func DetectUnusedExportedFunctions(allModuleInfos map[string]*domain.ModuleInfo,
 				continue
 			}
 
-			// Only target function and class declarations
-			if exp.Declaration != "function" && exp.Declaration != "class" {
-				// Also handle default exports of functions/classes
-				if exp.ExportType != "default" || (exp.Declaration != "function" && exp.Declaration != "class") {
-					continue
-				}
+			// Only target function and class declarations.
+			// The parser sets Declaration to AST node types like
+			// "FunctionDeclaration", "AsyncFunctionDeclaration", "ClassDeclaration", etc.
+			if !isFunctionOrClassDeclaration(exp.Declaration) {
+				continue
 			}
 
 			exportedNames := getExportedNames(exp)

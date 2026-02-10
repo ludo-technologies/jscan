@@ -780,7 +780,7 @@ func TestDetectUnusedExportedFunctions_UnusedFunction(t *testing.T) {
 			Exports: []*domain.Export{
 				{
 					ExportType:  "declaration",
-					Declaration: "function",
+					Declaration: "FunctionDeclaration",
 					Name:        "unusedFunc",
 					Location:    domain.SourceLocation{StartLine: 1, EndLine: 3},
 				},
@@ -816,7 +816,7 @@ func TestDetectUnusedExportedFunctions_UsedFunction(t *testing.T) {
 			Exports: []*domain.Export{
 				{
 					ExportType:  "declaration",
-					Declaration: "function",
+					Declaration: "FunctionDeclaration",
 					Name:        "usedFunc",
 					Location:    domain.SourceLocation{StartLine: 1, EndLine: 3},
 				},
@@ -885,7 +885,7 @@ func TestDetectUnusedExportedFunctions_EntryPointSkipped(t *testing.T) {
 			Exports: []*domain.Export{
 				{
 					ExportType:  "declaration",
-					Declaration: "function",
+					Declaration: "FunctionDeclaration",
 					Name:        "main",
 					Location:    domain.SourceLocation{StartLine: 1, EndLine: 3},
 				},
@@ -910,7 +910,7 @@ func TestDetectUnusedExportedFunctions_TestFileSkipped(t *testing.T) {
 			Exports: []*domain.Export{
 				{
 					ExportType:  "declaration",
-					Declaration: "function",
+					Declaration: "FunctionDeclaration",
 					Name:        "testHelper",
 					Location:    domain.SourceLocation{StartLine: 1, EndLine: 1},
 				},
@@ -935,7 +935,7 @@ func TestDetectUnusedExportedFunctions_DefaultExportFunction(t *testing.T) {
 			Exports: []*domain.Export{
 				{
 					ExportType:  "default",
-					Declaration: "function",
+					Declaration: "FunctionDeclaration",
 					Name:        "MyComponent",
 					Location:    domain.SourceLocation{StartLine: 1, EndLine: 10},
 				},
@@ -968,7 +968,7 @@ func TestDetectUnusedExportedFunctions_ClassExport(t *testing.T) {
 			Exports: []*domain.Export{
 				{
 					ExportType:  "declaration",
-					Declaration: "class",
+					Declaration: "ClassDeclaration",
 					Name:        "UserService",
 					Location:    domain.SourceLocation{StartLine: 1, EndLine: 20},
 				},
