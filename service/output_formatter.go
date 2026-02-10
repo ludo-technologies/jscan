@@ -432,6 +432,28 @@ func (f *OutputFormatterImpl) writeDeadCodeText(response *domain.DeadCodeRespons
 	for _, file := range response.Files {
 		if file.TotalFindings > 0 {
 			fmt.Fprintf(writer, "%s:\n", file.FilePath)
+
+			// File-level findings (unused imports/exports)
+			for _, finding := range file.FileLevelFindings {
+				severityIndicator := ""
+				switch finding.Severity {
+				case domain.DeadCodeSeverityCritical:
+					severityIndicator = " [CRITICAL]"
+				case domain.DeadCodeSeverityWarning:
+					severityIndicator = " [WARNING]"
+				case domain.DeadCodeSeverityInfo:
+					severityIndicator = " [INFO]"
+				}
+				fmt.Fprintf(writer, "  <file-level>:\n")
+				fmt.Fprintf(writer, "    Line %d-%d: %s%s\n",
+					finding.Location.StartLine, finding.Location.EndLine,
+					finding.Reason, severityIndicator)
+				if finding.Description != "" {
+					fmt.Fprintf(writer, "      %s\n", finding.Description)
+				}
+			}
+
+			// Function-level findings
 			for _, fn := range file.Functions {
 				if len(fn.Findings) > 0 {
 					fmt.Fprintf(writer, "  %s:\n", fn.Name)
@@ -889,6 +911,23 @@ func (f *OutputFormatterImpl) writeAnalyzeCSV(
 
 		// Write dead code findings
 		for _, file := range deadCodeResponse.Files {
+			// File-level findings (unused imports/exports)
+			for _, finding := range file.FileLevelFindings {
+				record := []string{
+					"dead_code",
+					finding.Location.FilePath,
+					"<file-level>",
+					strconv.Itoa(finding.Location.StartLine),
+					strconv.Itoa(finding.Location.EndLine),
+					string(finding.Severity),
+					finding.Reason,
+					finding.Description,
+				}
+				if err := csvWriter.Write(record); err != nil {
+					return err
+				}
+			}
+			// Function-level findings
 			for _, fn := range file.Functions {
 				for _, finding := range fn.Findings {
 					record := []string{

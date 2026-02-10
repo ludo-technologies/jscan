@@ -116,6 +116,9 @@ type FileDeadCode struct {
 	// Functions analyzed
 	Functions []FunctionDeadCode `json:"functions"`
 
+	// File-level findings (unused imports/exports, not scoped to a function)
+	FileLevelFindings []DeadCodeFinding `json:"file_level_findings,omitempty"`
+
 	// File-level summary
 	TotalFindings     int     `json:"total_findings"`
 	TotalFunctions    int     `json:"total_functions"`

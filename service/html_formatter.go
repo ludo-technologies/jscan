@@ -580,6 +580,15 @@ const htmlTemplate = `<!DOCTYPE html>
                     </thead>
                     <tbody>
                         {{range $file := .DeadCode.Files}}
+                        {{range $finding := $file.FileLevelFindings}}
+                        <tr>
+                            <td>{{$finding.Location.FilePath}}</td>
+                            <td><em>&lt;file-level&gt;</em></td>
+                            <td>{{$finding.Location.StartLine}}-{{$finding.Location.EndLine}}</td>
+                            <td class="severity-{{$finding.Severity}}">{{$finding.Severity}}</td>
+                            <td>{{$finding.Description}}</td>
+                        </tr>
+                        {{end}}
                         {{range $func := $file.Functions}}
                         {{range $i, $finding := $func.Findings}}
                         {{if lt $i 20}}
