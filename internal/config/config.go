@@ -258,7 +258,15 @@ func DefaultConfig() *Config {
 			ExcludePatterns: []string{
 				// Package managers and dependencies
 				"node_modules",
+				"bower_components",
+				"jspm_packages",
+				// Vendored / third-party code
 				"vendor",
+				"assets",
+				"third_party",
+				"third-party",
+				"extern",
+				"external",
 				// Build outputs
 				"dist",
 				"build",
