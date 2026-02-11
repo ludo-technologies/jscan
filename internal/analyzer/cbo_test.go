@@ -16,11 +16,11 @@ func TestDefaultCBOAnalyzerConfig(t *testing.T) {
 	if !config.IncludeTypeImports {
 		t.Error("Expected IncludeTypeImports to be true by default")
 	}
-	if config.LowThreshold != 3 {
-		t.Errorf("Expected LowThreshold to be 3, got %d", config.LowThreshold)
+	if config.LowThreshold != 7 {
+		t.Errorf("Expected LowThreshold to be 7, got %d", config.LowThreshold)
 	}
-	if config.MediumThreshold != 7 {
-		t.Errorf("Expected MediumThreshold to be 7, got %d", config.MediumThreshold)
+	if config.MediumThreshold != 14 {
+		t.Errorf("Expected MediumThreshold to be 14, got %d", config.MediumThreshold)
 	}
 }
 
@@ -166,6 +166,11 @@ import b from 'b';
 import c from 'c';
 import d from 'd';
 import e from 'e';
+import f from 'f';
+import g from 'g';
+import h from 'h';
+import i from 'i';
+import j from 'j';
 `
 
 	p := parser.NewParser()
@@ -182,7 +187,7 @@ import e from 'e';
 		t.Fatalf("Failed to analyze: %v", err)
 	}
 
-	// With 5 dependencies (> 3, <= 7), risk should be medium
+	// With 10 dependencies (> 7, <= 14), risk should be medium
 	if result.RiskLevel != domain.RiskLevelMedium {
 		t.Errorf("Expected risk level Medium, got %v (CBO: %d)", result.RiskLevel, result.Metrics.CouplingCount)
 	}
@@ -198,6 +203,13 @@ import e from 'e';
 import f from 'f';
 import g from 'g';
 import h from 'h';
+import i from 'i';
+import j from 'j';
+import k from 'k';
+import l from 'l';
+import m from 'm';
+import n from 'n';
+import o from 'o';
 `
 
 	p := parser.NewParser()
@@ -214,7 +226,7 @@ import h from 'h';
 		t.Fatalf("Failed to analyze: %v", err)
 	}
 
-	// With 8 dependencies (> 7), risk should be high
+	// With 15 dependencies (> 14), risk should be high
 	if result.RiskLevel != domain.RiskLevelHigh {
 		t.Errorf("Expected risk level High, got %v (CBO: %d)", result.RiskLevel, result.Metrics.CouplingCount)
 	}
@@ -458,12 +470,12 @@ func TestCalculateRiskLevel(t *testing.T) {
 	}{
 		{0, domain.RiskLevelLow},
 		{1, domain.RiskLevelLow},
-		{3, domain.RiskLevelLow},
-		{4, domain.RiskLevelMedium},
-		{5, domain.RiskLevelMedium},
-		{7, domain.RiskLevelMedium},
-		{8, domain.RiskLevelHigh},
-		{10, domain.RiskLevelHigh},
+		{7, domain.RiskLevelLow},
+		{8, domain.RiskLevelMedium},
+		{10, domain.RiskLevelMedium},
+		{14, domain.RiskLevelMedium},
+		{15, domain.RiskLevelHigh},
+		{20, domain.RiskLevelHigh},
 		{100, domain.RiskLevelHigh},
 	}
 

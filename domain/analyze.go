@@ -109,7 +109,8 @@ type AnalyzeSummary struct {
 	// Key metrics
 	TotalFunctions      int     `json:"total_functions" yaml:"total_functions"`
 	AverageComplexity   float64 `json:"average_complexity" yaml:"average_complexity"`
-	HighComplexityCount int     `json:"high_complexity_count" yaml:"high_complexity_count"`
+	HighComplexityCount   int `json:"high_complexity_count" yaml:"high_complexity_count"`
+	MediumComplexityCount int `json:"medium_complexity_count" yaml:"medium_complexity_count"`
 
 	DeadCodeCount    int `json:"dead_code_count" yaml:"dead_code_count"`
 	CriticalDeadCode int `json:"critical_dead_code" yaml:"critical_dead_code"`
@@ -189,15 +190,20 @@ func (s *AnalyzeSummary) Validate() error {
 }
 
 // calculateComplexityPenalty calculates the penalty for complexity (max 20)
-// Uses continuous linear function starting from avg complexity of 2
+// Uses ratio of high/medium complexity functions (ESLint-aligned: high > 20, medium 10-20)
+// Weight: High = 1.0, Medium = 0.5
+// Reaches max penalty when 30% or more functions are problematic
 func (s *AnalyzeSummary) calculateComplexityPenalty() int {
-	// Linear penalty: starts at avg=2, reaches max (20) at avg=15
-	// Formula: penalty = (avg - 2) / 13 * 20
-	if s.AverageComplexity <= 2.0 {
+	if s.TotalFunctions == 0 {
 		return 0
 	}
 
-	penalty := (s.AverageComplexity - 2.0) / 13.0 * 20.0
+	// Weighted ratio of problematic functions
+	weighted := float64(s.HighComplexityCount) + 0.5*float64(s.MediumComplexityCount)
+	ratio := weighted / float64(s.TotalFunctions)
+
+	// Linear penalty: reaches max (20) at 5% problematic ratio
+	penalty := ratio / 0.05 * 20.0
 	if penalty > 20.0 {
 		penalty = 20.0
 	}

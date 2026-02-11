@@ -1030,6 +1030,191 @@ func TestCFGBuilder_Build_AnonymousFunction(t *testing.T) {
 	}
 }
 
+func TestCFGBuilder_BuildAll_ArrowInVariable(t *testing.T) {
+	code := `const add = (a, b) => a + b;`
+	ast := parseJS(t, code)
+
+	builder := NewCFGBuilder()
+	cfgs, err := builder.BuildAll(ast)
+	if err != nil {
+		t.Fatalf("BuildAll failed: %v", err)
+	}
+
+	// Should have __main__ plus at least one function for the arrow
+	if len(cfgs) < 2 {
+		t.Errorf("BuildAll should detect arrow function in variable declaration, got %d CFGs", len(cfgs))
+	}
+
+	// Check that a CFG exists for the arrow function (may be named "add" or "anonymous_<line>")
+	found := false
+	for name := range cfgs {
+		if name != "__main__" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Error("Arrow function in variable declaration should be discovered")
+	}
+}
+
+func TestCFGBuilder_BuildAll_FunctionExpressionInVariable(t *testing.T) {
+	code := `const fn = function() { return 42; };`
+	ast := parseJS(t, code)
+
+	builder := NewCFGBuilder()
+	cfgs, err := builder.BuildAll(ast)
+	if err != nil {
+		t.Fatalf("BuildAll failed: %v", err)
+	}
+
+	if len(cfgs) < 2 {
+		t.Errorf("BuildAll should detect function expression in variable, got %d CFGs", len(cfgs))
+	}
+
+	found := false
+	for name := range cfgs {
+		if name != "__main__" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Error("Function expression in variable declaration should be discovered")
+	}
+}
+
+func TestCFGBuilder_BuildAll_AssignmentFunctionExpression(t *testing.T) {
+	code := `
+		const app = {};
+		app.init = function init() { return true; };
+	`
+	ast := parseJS(t, code)
+
+	builder := NewCFGBuilder()
+	cfgs, err := builder.BuildAll(ast)
+	if err != nil {
+		t.Fatalf("BuildAll failed: %v", err)
+	}
+
+	if len(cfgs) < 2 {
+		t.Errorf("BuildAll should detect assigned function expression, got %d CFGs", len(cfgs))
+	}
+
+	// The named function expression should be found (name: "init")
+	found := false
+	for name := range cfgs {
+		if name != "__main__" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Error("Assignment function expression should be discovered")
+	}
+}
+
+func TestCFGBuilder_BuildAll_ObjectMethods(t *testing.T) {
+	code := `
+		const obj = {
+			method() { return 1; },
+			other() { return 2; }
+		};
+	`
+	ast := parseJS(t, code)
+
+	builder := NewCFGBuilder()
+	cfgs, err := builder.BuildAll(ast)
+	if err != nil {
+		t.Fatalf("BuildAll failed: %v", err)
+	}
+
+	// Should have __main__ + at least 2 methods
+	if len(cfgs) < 3 {
+		t.Errorf("BuildAll should detect object methods, got %d CFGs (want >= 3)", len(cfgs))
+	}
+}
+
+func TestCFGBuilder_BuildAll_ExportedArrowFunction(t *testing.T) {
+	code := `export const foo = () => { return 42; };`
+	ast := parseJS(t, code)
+
+	builder := NewCFGBuilder()
+	cfgs, err := builder.BuildAll(ast)
+	if err != nil {
+		t.Fatalf("BuildAll failed: %v", err)
+	}
+
+	if len(cfgs) < 2 {
+		t.Errorf("BuildAll should detect exported arrow function, got %d CFGs", len(cfgs))
+	}
+
+	found := false
+	for name := range cfgs {
+		if name != "__main__" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Error("Exported arrow function should be discovered")
+	}
+}
+
+func TestCFGBuilder_BuildAll_CallbackArgument(t *testing.T) {
+	code := `setTimeout(function() { console.log("hi"); }, 1000);`
+	ast := parseJS(t, code)
+
+	builder := NewCFGBuilder()
+	cfgs, err := builder.BuildAll(ast)
+	if err != nil {
+		t.Fatalf("BuildAll failed: %v", err)
+	}
+
+	if len(cfgs) < 2 {
+		t.Errorf("BuildAll should detect callback function, got %d CFGs", len(cfgs))
+	}
+
+	found := false
+	for name := range cfgs {
+		if name != "__main__" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Error("Callback function expression should be discovered")
+	}
+}
+
+func TestCFGBuilder_BuildAll_Mixed(t *testing.T) {
+	code := `
+		function declared() { return 1; }
+		const arrow = (x) => x * 2;
+		module.exports.init = function() { return 3; };
+		const obj = {
+			method() { return 4; }
+		};
+	`
+	ast := parseJS(t, code)
+
+	builder := NewCFGBuilder()
+	cfgs, err := builder.BuildAll(ast)
+	if err != nil {
+		t.Fatalf("BuildAll failed: %v", err)
+	}
+
+	// Should have __main__ + declared + arrow + assignment func + object method = 5
+	if len(cfgs) < 5 {
+		t.Errorf("BuildAll should detect all mixed function patterns, got %d CFGs (want >= 5)", len(cfgs))
+	}
+
+	// declared() should definitely be there
+	if cfgs["declared"] == nil {
+		t.Error("Should have 'declared' CFG from function declaration")
+	}
+}
+
 // Helper visitor for checking edge types
 type edgeTypeChecker struct {
 	onEdge func(*Edge)

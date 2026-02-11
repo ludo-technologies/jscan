@@ -28,8 +28,8 @@ func DefaultCBOAnalyzerConfig() *CBOAnalyzerConfig {
 	return &CBOAnalyzerConfig{
 		IncludeBuiltins:    false,
 		IncludeTypeImports: true,
-		LowThreshold:       3,
-		MediumThreshold:    7,
+		LowThreshold:       7,
+		MediumThreshold:    14,
 	}
 }
 

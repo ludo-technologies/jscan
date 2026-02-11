@@ -4,6 +4,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	ignore "github.com/sabhiram/go-gitignore"
 )
 
 // FileHelper provides file operation utilities
@@ -33,9 +35,23 @@ func (h *FileHelper) CollectJSFiles(paths []string, recursive bool, includePatte
 
 		// Directory handling
 		if recursive {
+			// Load .gitignore from root directory
+			gi := loadGitIgnore(path)
+
 			err = filepath.Walk(path, func(filePath string, info os.FileInfo, err error) error {
 				if err != nil {
 					return err
+				}
+
+				// gitignore check (relative path required)
+				if gi != nil {
+					relPath, relErr := filepath.Rel(path, filePath)
+					if relErr == nil && gi.MatchesPath(relPath) {
+						if info.IsDir() {
+							return filepath.SkipDir
+						}
+						return nil
+					}
 				}
 
 				// Skip excluded directories early
@@ -130,6 +146,17 @@ func (h *FileHelper) isExcluded(path string, excludePatterns []string) bool {
 		}
 	}
 	return false
+}
+
+// loadGitIgnore loads a .gitignore file from the root directory.
+// Returns nil if the file does not exist or cannot be read.
+func loadGitIgnore(root string) *ignore.GitIgnore {
+	gitignorePath := filepath.Join(root, ".gitignore")
+	gi, err := ignore.CompileIgnoreFile(gitignorePath)
+	if err != nil {
+		return nil
+	}
+	return gi
 }
 
 // ResolveFilePaths resolves file paths, returning existing files directly
