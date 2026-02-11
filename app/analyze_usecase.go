@@ -124,6 +124,7 @@ func (uc *AnalyzeUseCase) Execute(ctx context.Context, config AnalyzeConfig, pat
 			result.Summary.TotalFunctions = response.Summary.TotalFunctions
 			result.Summary.AverageComplexity = response.Summary.AverageComplexity
 			result.Summary.HighComplexityCount = response.Summary.HighRiskFunctions
+			result.Summary.MediumComplexityCount = response.Summary.MediumRiskFunctions
 		}
 	}
 

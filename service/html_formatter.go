@@ -62,6 +62,7 @@ func (f *OutputFormatterImpl) WriteHTML(
 		summary.TotalFunctions = complexityResponse.Summary.TotalFunctions
 		summary.AverageComplexity = complexityResponse.Summary.AverageComplexity
 		summary.HighComplexityCount = complexityResponse.Summary.HighRiskFunctions
+		summary.MediumComplexityCount = complexityResponse.Summary.MediumRiskFunctions
 		summary.AnalyzedFiles = complexityResponse.Summary.FilesAnalyzed
 	}
 

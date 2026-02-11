@@ -263,6 +263,7 @@ func DefaultConfig() *Config {
 				// Vendored / third-party code
 				"vendor",
 				"assets",
+				"overrides",
 				"third_party",
 				"third-party",
 				"extern",
