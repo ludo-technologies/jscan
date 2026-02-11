@@ -118,7 +118,7 @@ func TestConfigurationLoader_FindDefaultConfigFile_NotFound(t *testing.T) {
 	// Change to temp directory with no config files
 	tempDir := t.TempDir()
 	origDir, _ := os.Getwd()
-	defer os.Chdir(origDir)
+	defer func() { _ = os.Chdir(origDir) }()
 
 	if err := os.Chdir(tempDir); err != nil {
 		t.Fatalf("Failed to change directory: %v", err)
@@ -141,7 +141,7 @@ func TestConfigurationLoader_FindDefaultConfigFile_Found(t *testing.T) {
 	}
 
 	origDir, _ := os.Getwd()
-	defer os.Chdir(origDir)
+	defer func() { _ = os.Chdir(origDir) }()
 
 	if err := os.Chdir(tempDir); err != nil {
 		t.Fatalf("Failed to change directory: %v", err)
@@ -166,7 +166,7 @@ func TestConfigurationLoader_FindDefaultConfigFile_AlternativeNames(t *testing.T
 	}
 
 	origDir, _ := os.Getwd()
-	defer os.Chdir(origDir)
+	defer func() { _ = os.Chdir(origDir) }()
 
 	if err := os.Chdir(tempDir); err != nil {
 		t.Fatalf("Failed to change directory: %v", err)

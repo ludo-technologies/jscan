@@ -44,42 +44,42 @@ const (
 	NodeThrowStatement    NodeType = "ThrowStatement"
 
 	// Exception handling
-	NodeTryStatement   NodeType = "TryStatement"
-	NodeCatchClause    NodeType = "CatchClause"
-	NodeFinallyClause  NodeType = "FinallyClause"
+	NodeTryStatement  NodeType = "TryStatement"
+	NodeCatchClause   NodeType = "CatchClause"
+	NodeFinallyClause NodeType = "FinallyClause"
 
 	// Expressions
-	NodeCallExpression       NodeType = "CallExpression"
-	NodeMemberExpression     NodeType = "MemberExpression"
-	NodeBinaryExpression     NodeType = "BinaryExpression"
-	NodeUnaryExpression      NodeType = "UnaryExpression"
-	NodeLogicalExpression    NodeType = "LogicalExpression"
+	NodeCallExpression        NodeType = "CallExpression"
+	NodeMemberExpression      NodeType = "MemberExpression"
+	NodeBinaryExpression      NodeType = "BinaryExpression"
+	NodeUnaryExpression       NodeType = "UnaryExpression"
+	NodeLogicalExpression     NodeType = "LogicalExpression"
 	NodeConditionalExpression NodeType = "ConditionalExpression"
-	NodeAssignmentExpression NodeType = "AssignmentExpression"
-	NodeUpdateExpression     NodeType = "UpdateExpression"
-	NodeNewExpression        NodeType = "NewExpression"
-	NodeThisExpression       NodeType = "ThisExpression"
-	NodeSequenceExpression   NodeType = "SequenceExpression"
-	NodeAwaitExpression      NodeType = "AwaitExpression"
-	NodeYieldExpression      NodeType = "YieldExpression"
-	NodeSpreadElement        NodeType = "SpreadElement"
-	NodeTemplateLiteral      NodeType = "TemplateLiteral"
+	NodeAssignmentExpression  NodeType = "AssignmentExpression"
+	NodeUpdateExpression      NodeType = "UpdateExpression"
+	NodeNewExpression         NodeType = "NewExpression"
+	NodeThisExpression        NodeType = "ThisExpression"
+	NodeSequenceExpression    NodeType = "SequenceExpression"
+	NodeAwaitExpression       NodeType = "AwaitExpression"
+	NodeYieldExpression       NodeType = "YieldExpression"
+	NodeSpreadElement         NodeType = "SpreadElement"
+	NodeTemplateLiteral       NodeType = "TemplateLiteral"
 
 	// Literals
-	NodeLiteral       NodeType = "Literal"
-	NodeStringLiteral NodeType = "StringLiteral"
-	NodeNumberLiteral NodeType = "NumberLiteral"
-	NodeBooleanLiteral NodeType = "BooleanLiteral"
-	NodeNullLiteral   NodeType = "NullLiteral"
-	NodeRegExpLiteral NodeType = "RegExpLiteral"
-	NodeArrayExpression NodeType = "ArrayExpression"
+	NodeLiteral          NodeType = "Literal"
+	NodeStringLiteral    NodeType = "StringLiteral"
+	NodeNumberLiteral    NodeType = "NumberLiteral"
+	NodeBooleanLiteral   NodeType = "BooleanLiteral"
+	NodeNullLiteral      NodeType = "NullLiteral"
+	NodeRegExpLiteral    NodeType = "RegExpLiteral"
+	NodeArrayExpression  NodeType = "ArrayExpression"
 	NodeObjectExpression NodeType = "ObjectExpression"
-	NodeProperty      NodeType = "Property"
+	NodeProperty         NodeType = "Property"
 
 	// Module system (ESM)
-	NodeImportDeclaration      NodeType = "ImportDeclaration"
-	NodeImportSpecifier        NodeType = "ImportSpecifier"
-	NodeImportDefaultSpecifier NodeType = "ImportDefaultSpecifier"
+	NodeImportDeclaration        NodeType = "ImportDeclaration"
+	NodeImportSpecifier          NodeType = "ImportSpecifier"
+	NodeImportDefaultSpecifier   NodeType = "ImportDefaultSpecifier"
 	NodeImportNamespaceSpecifier NodeType = "ImportNamespaceSpecifier"
 	NodeExportNamedDeclaration   NodeType = "ExportNamedDeclaration"
 	NodeExportDefaultDeclaration NodeType = "ExportDefaultDeclaration"
@@ -100,18 +100,18 @@ const (
 
 	// TypeScript-specific nodes
 	NodeInterfaceDeclaration NodeType = "InterfaceDeclaration"
-	NodeTypeAlias           NodeType = "TypeAliasDeclaration"
-	NodeEnumDeclaration     NodeType = "EnumDeclaration"
-	NodeTypeAnnotation      NodeType = "TypeAnnotation"
-	NodeTypeParameter       NodeType = "TypeParameter"
-	NodeImportType          NodeType = "ImportType"
-	NodeAsExpression        NodeType = "AsExpression"
-	NodeNonNullExpression   NodeType = "NonNullExpression"
+	NodeTypeAlias            NodeType = "TypeAliasDeclaration"
+	NodeEnumDeclaration      NodeType = "EnumDeclaration"
+	NodeTypeAnnotation       NodeType = "TypeAnnotation"
+	NodeTypeParameter        NodeType = "TypeParameter"
+	NodeImportType           NodeType = "ImportType"
+	NodeAsExpression         NodeType = "AsExpression"
+	NodeNonNullExpression    NodeType = "NonNullExpression"
 
 	// JSX (if needed)
-	NodeJSXElement    NodeType = "JSXElement"
-	NodeJSXFragment   NodeType = "JSXFragment"
-	NodeJSXAttribute  NodeType = "JSXAttribute"
+	NodeJSXElement   NodeType = "JSXElement"
+	NodeJSXFragment  NodeType = "JSXFragment"
+	NodeJSXAttribute NodeType = "JSXAttribute"
 
 	// Tree-sitter specific structural nodes
 	NodeStatementBlock NodeType = "StatementBlock"
@@ -144,10 +144,10 @@ type Node struct {
 	Name string // For function/class/variable names
 
 	// Function-related fields
-	Params []*Node // Function parameters
-	Body   []*Node // Function/block body
-	Async  bool    // Async function
-	Generator bool // Generator function
+	Params    []*Node // Function parameters
+	Body      []*Node // Function/block body
+	Async     bool    // Async function
+	Generator bool    // Generator function
 
 	// Control flow fields
 	Test       *Node   // Condition for if/while/for
@@ -158,30 +158,30 @@ type Node struct {
 	Cases      []*Node // Switch cases
 
 	// Try-catch fields
-	Handler  *Node   // Catch clause
-	Finalizer *Node  // Finally block
-	Handlers []*Node // Multiple catch handlers
+	Handler   *Node   // Catch clause
+	Finalizer *Node   // Finally block
+	Handlers  []*Node // Multiple catch handlers
 
 	// Expression fields
-	Left     *Node  // Left operand
-	Right    *Node  // Right operand
-	Operator string // Operator (+, -, *, etc.)
-	Argument *Node  // Unary expression argument
+	Left      *Node   // Left operand
+	Right     *Node   // Right operand
+	Operator  string  // Operator (+, -, *, etc.)
+	Argument  *Node   // Unary expression argument
 	Arguments []*Node // Function call arguments
-	Callee   *Node  // Function being called
-	Object   *Node  // Object in member expression
-	Property *Node  // Property in member expression
+	Callee    *Node   // Function being called
+	Object    *Node   // Object in member expression
+	Property  *Node   // Property in member expression
 
 	// Variable declaration fields
 	Kind         string  // var, let, const
 	Declarations []*Node // Variable declarators
 
 	// Import/Export fields
-	Source     *Node   // Import source
-	Specifiers []*Node // Import/export specifiers
-	Declaration *Node  // Export declaration
-	Imported   *Node   // Imported name
-	Local      *Node   // Local binding
+	Source      *Node   // Import source
+	Specifiers  []*Node // Import/export specifiers
+	Declaration *Node   // Export declaration
+	Imported    *Node   // Imported name
+	Local       *Node   // Local binding
 
 	// TypeScript fields
 	TypeAnnotation *Node   // Type annotation
@@ -196,15 +196,15 @@ type Node struct {
 // NewNode creates a new AST node
 func NewNode(nodeType NodeType) *Node {
 	return &Node{
-		Type:         nodeType,
-		Children:     []*Node{},
-		Params:       []*Node{},
-		Body:         []*Node{},
-		Cases:        []*Node{},
-		Handlers:     []*Node{},
-		Arguments:    []*Node{},
-		Declarations: []*Node{},
-		Specifiers:   []*Node{},
+		Type:           nodeType,
+		Children:       []*Node{},
+		Params:         []*Node{},
+		Body:           []*Node{},
+		Cases:          []*Node{},
+		Handlers:       []*Node{},
+		Arguments:      []*Node{},
+		Declarations:   []*Node{},
+		Specifiers:     []*Node{},
 		TypeParameters: []*Node{},
 	}
 }

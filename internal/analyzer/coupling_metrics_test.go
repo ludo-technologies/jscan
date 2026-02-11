@@ -85,12 +85,12 @@ func TestCalculateInstability(t *testing.T) {
 		ce       int
 		expected float64
 	}{
-		{0, 0, 0.5},    // No coupling - neutral
-		{5, 0, 0.0},    // Only incoming - completely stable
-		{0, 5, 1.0},    // Only outgoing - completely unstable
-		{5, 5, 0.5},    // Equal - neutral
-		{8, 2, 0.2},    // More incoming - stable
-		{2, 8, 0.8},    // More outgoing - unstable
+		{0, 0, 0.5}, // No coupling - neutral
+		{5, 0, 0.0}, // Only incoming - completely stable
+		{0, 5, 1.0}, // Only outgoing - completely unstable
+		{5, 5, 0.5}, // Equal - neutral
+		{8, 2, 0.2}, // More incoming - stable
+		{2, 8, 0.8}, // More outgoing - unstable
 	}
 
 	for _, tc := range testCases {
@@ -109,12 +109,12 @@ func TestCalculateDistance(t *testing.T) {
 		abstractness float64
 		expected     float64
 	}{
-		{0.5, 0.5, 0.0},    // On main sequence
-		{1.0, 0.0, 0.0},    // On main sequence
-		{0.0, 1.0, 0.0},    // On main sequence
-		{0.0, 0.0, 1.0},    // Zone of pain - max distance
-		{1.0, 1.0, 1.0},    // Zone of uselessness - max distance
-		{0.5, 0.0, 0.5},    // Halfway
+		{0.5, 0.5, 0.0}, // On main sequence
+		{1.0, 0.0, 0.0}, // On main sequence
+		{0.0, 1.0, 0.0}, // On main sequence
+		{0.0, 0.0, 1.0}, // Zone of pain - max distance
+		{1.0, 1.0, 1.0}, // Zone of uselessness - max distance
+		{0.5, 0.0, 0.5}, // Halfway
 	}
 
 	for _, tc := range testCases {

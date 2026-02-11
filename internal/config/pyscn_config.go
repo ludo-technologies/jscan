@@ -41,21 +41,21 @@ type PyscnConfig struct {
 	ComplexityMinComplexity   int `mapstructure:"complexity_min_complexity" yaml:"complexity_min_complexity" json:"complexity_min_complexity"`
 
 	// DeadCode Configuration (from [dead_code] section in TOML)
-	DeadCodeEnabled                   *bool     `mapstructure:"dead_code_enabled" yaml:"dead_code_enabled" json:"dead_code_enabled"`
+	DeadCodeEnabled                   *bool    `mapstructure:"dead_code_enabled" yaml:"dead_code_enabled" json:"dead_code_enabled"`
 	DeadCodeMinSeverity               string   `mapstructure:"dead_code_min_severity" yaml:"dead_code_min_severity" json:"dead_code_min_severity"`
-	DeadCodeShowContext               *bool     `mapstructure:"dead_code_show_context" yaml:"dead_code_show_context" json:"dead_code_show_context"`
+	DeadCodeShowContext               *bool    `mapstructure:"dead_code_show_context" yaml:"dead_code_show_context" json:"dead_code_show_context"`
 	DeadCodeContextLines              int      `mapstructure:"dead_code_context_lines" yaml:"dead_code_context_lines" json:"dead_code_context_lines"`
 	DeadCodeSortBy                    string   `mapstructure:"dead_code_sort_by" yaml:"dead_code_sort_by" json:"dead_code_sort_by"`
-	DeadCodeDetectAfterReturn         *bool     `mapstructure:"dead_code_detect_after_return" yaml:"dead_code_detect_after_return" json:"dead_code_detect_after_return"`
-	DeadCodeDetectAfterBreak          *bool     `mapstructure:"dead_code_detect_after_break" yaml:"dead_code_detect_after_break" json:"dead_code_detect_after_break"`
-	DeadCodeDetectAfterContinue       *bool     `mapstructure:"dead_code_detect_after_continue" yaml:"dead_code_detect_after_continue" json:"dead_code_detect_after_continue"`
-	DeadCodeDetectAfterRaise          *bool     `mapstructure:"dead_code_detect_after_raise" yaml:"dead_code_detect_after_raise" json:"dead_code_detect_after_raise"`
-	DeadCodeDetectUnreachableBranches *bool     `mapstructure:"dead_code_detect_unreachable_branches" yaml:"dead_code_detect_unreachable_branches" json:"dead_code_detect_unreachable_branches"`
+	DeadCodeDetectAfterReturn         *bool    `mapstructure:"dead_code_detect_after_return" yaml:"dead_code_detect_after_return" json:"dead_code_detect_after_return"`
+	DeadCodeDetectAfterBreak          *bool    `mapstructure:"dead_code_detect_after_break" yaml:"dead_code_detect_after_break" json:"dead_code_detect_after_break"`
+	DeadCodeDetectAfterContinue       *bool    `mapstructure:"dead_code_detect_after_continue" yaml:"dead_code_detect_after_continue" json:"dead_code_detect_after_continue"`
+	DeadCodeDetectAfterRaise          *bool    `mapstructure:"dead_code_detect_after_raise" yaml:"dead_code_detect_after_raise" json:"dead_code_detect_after_raise"`
+	DeadCodeDetectUnreachableBranches *bool    `mapstructure:"dead_code_detect_unreachable_branches" yaml:"dead_code_detect_unreachable_branches" json:"dead_code_detect_unreachable_branches"`
 	DeadCodeIgnorePatterns            []string `mapstructure:"dead_code_ignore_patterns" yaml:"dead_code_ignore_patterns" json:"dead_code_ignore_patterns"`
 
 	// Output Configuration (from [output] section in TOML - general output settings)
 	OutputFormat        string `mapstructure:"output_format" yaml:"output_format" json:"output_format"`
-	OutputShowDetails   *bool   `mapstructure:"output_show_details" yaml:"output_show_details" json:"output_show_details"`
+	OutputShowDetails   *bool  `mapstructure:"output_show_details" yaml:"output_show_details" json:"output_show_details"`
 	OutputSortBy        string `mapstructure:"output_sort_by" yaml:"output_sort_by" json:"output_sort_by"`
 	OutputMinComplexity int    `mapstructure:"output_min_complexity" yaml:"output_min_complexity" json:"output_min_complexity"`
 	OutputDirectory     string `mapstructure:"output_directory" yaml:"output_directory" json:"output_directory"`
@@ -63,38 +63,38 @@ type PyscnConfig struct {
 	// Analysis Configuration (from [analysis] section in TOML - general analysis settings)
 	AnalysisIncludePatterns []string `mapstructure:"analysis_include_patterns" yaml:"analysis_include_patterns" json:"analysis_include_patterns"`
 	AnalysisExcludePatterns []string `mapstructure:"analysis_exclude_patterns" yaml:"analysis_exclude_patterns" json:"analysis_exclude_patterns"`
-	AnalysisRecursive       *bool     `mapstructure:"analysis_recursive" yaml:"analysis_recursive" json:"analysis_recursive"`
-	AnalysisFollowSymlinks  *bool     `mapstructure:"analysis_follow_symlinks" yaml:"analysis_follow_symlinks" json:"analysis_follow_symlinks"`
+	AnalysisRecursive       *bool    `mapstructure:"analysis_recursive" yaml:"analysis_recursive" json:"analysis_recursive"`
+	AnalysisFollowSymlinks  *bool    `mapstructure:"analysis_follow_symlinks" yaml:"analysis_follow_symlinks" json:"analysis_follow_symlinks"`
 
 	// CBO Configuration (from [cbo] section in TOML)
-	CboLowThreshold    int  `mapstructure:"cbo_low_threshold" yaml:"cbo_low_threshold" json:"cbo_low_threshold"`
-	CboMediumThreshold int  `mapstructure:"cbo_medium_threshold" yaml:"cbo_medium_threshold" json:"cbo_medium_threshold"`
-	CboMinCbo          int  `mapstructure:"cbo_min_cbo" yaml:"cbo_min_cbo" json:"cbo_min_cbo"`
-	CboMaxCbo          int  `mapstructure:"cbo_max_cbo" yaml:"cbo_max_cbo" json:"cbo_max_cbo"`
+	CboLowThreshold    int   `mapstructure:"cbo_low_threshold" yaml:"cbo_low_threshold" json:"cbo_low_threshold"`
+	CboMediumThreshold int   `mapstructure:"cbo_medium_threshold" yaml:"cbo_medium_threshold" json:"cbo_medium_threshold"`
+	CboMinCbo          int   `mapstructure:"cbo_min_cbo" yaml:"cbo_min_cbo" json:"cbo_min_cbo"`
+	CboMaxCbo          int   `mapstructure:"cbo_max_cbo" yaml:"cbo_max_cbo" json:"cbo_max_cbo"`
 	CboShowZeros       *bool `mapstructure:"cbo_show_zeros" yaml:"cbo_show_zeros" json:"cbo_show_zeros"`
 	CboIncludeBuiltins *bool `mapstructure:"cbo_include_builtins" yaml:"cbo_include_builtins" json:"cbo_include_builtins"`
 	CboIncludeImports  *bool `mapstructure:"cbo_include_imports" yaml:"cbo_include_imports" json:"cbo_include_imports"`
 
 	// Architecture Configuration (from [architecture] section in TOML)
-	ArchitectureEnabled                         *bool     `mapstructure:"architecture_enabled" yaml:"architecture_enabled" json:"architecture_enabled"`
-	ArchitectureValidateLayers                  *bool     `mapstructure:"architecture_validate_layers" yaml:"architecture_validate_layers" json:"architecture_validate_layers"`
-	ArchitectureValidateCohesion                *bool     `mapstructure:"architecture_validate_cohesion" yaml:"architecture_validate_cohesion" json:"architecture_validate_cohesion"`
-	ArchitectureValidateResponsibility          *bool     `mapstructure:"architecture_validate_responsibility" yaml:"architecture_validate_responsibility" json:"architecture_validate_responsibility"`
+	ArchitectureEnabled                         *bool    `mapstructure:"architecture_enabled" yaml:"architecture_enabled" json:"architecture_enabled"`
+	ArchitectureValidateLayers                  *bool    `mapstructure:"architecture_validate_layers" yaml:"architecture_validate_layers" json:"architecture_validate_layers"`
+	ArchitectureValidateCohesion                *bool    `mapstructure:"architecture_validate_cohesion" yaml:"architecture_validate_cohesion" json:"architecture_validate_cohesion"`
+	ArchitectureValidateResponsibility          *bool    `mapstructure:"architecture_validate_responsibility" yaml:"architecture_validate_responsibility" json:"architecture_validate_responsibility"`
 	ArchitectureMinCohesion                     float64  `mapstructure:"architecture_min_cohesion" yaml:"architecture_min_cohesion" json:"architecture_min_cohesion"`
 	ArchitectureMaxCoupling                     int      `mapstructure:"architecture_max_coupling" yaml:"architecture_max_coupling" json:"architecture_max_coupling"`
 	ArchitectureMaxResponsibilities             int      `mapstructure:"architecture_max_responsibilities" yaml:"architecture_max_responsibilities" json:"architecture_max_responsibilities"`
 	ArchitectureLayerViolationSeverity          string   `mapstructure:"architecture_layer_violation_severity" yaml:"architecture_layer_violation_severity" json:"architecture_layer_violation_severity"`
 	ArchitectureCohesionViolationSeverity       string   `mapstructure:"architecture_cohesion_violation_severity" yaml:"architecture_cohesion_violation_severity" json:"architecture_cohesion_violation_severity"`
 	ArchitectureResponsibilityViolationSeverity string   `mapstructure:"architecture_responsibility_violation_severity" yaml:"architecture_responsibility_violation_severity" json:"architecture_responsibility_violation_severity"`
-	ArchitectureShowAllViolations               *bool     `mapstructure:"architecture_show_all_violations" yaml:"architecture_show_all_violations" json:"architecture_show_all_violations"`
-	ArchitectureGroupByType                     *bool     `mapstructure:"architecture_group_by_type" yaml:"architecture_group_by_type" json:"architecture_group_by_type"`
-	ArchitectureIncludeSuggestions              *bool     `mapstructure:"architecture_include_suggestions" yaml:"architecture_include_suggestions" json:"architecture_include_suggestions"`
+	ArchitectureShowAllViolations               *bool    `mapstructure:"architecture_show_all_violations" yaml:"architecture_show_all_violations" json:"architecture_show_all_violations"`
+	ArchitectureGroupByType                     *bool    `mapstructure:"architecture_group_by_type" yaml:"architecture_group_by_type" json:"architecture_group_by_type"`
+	ArchitectureIncludeSuggestions              *bool    `mapstructure:"architecture_include_suggestions" yaml:"architecture_include_suggestions" json:"architecture_include_suggestions"`
 	ArchitectureMaxViolationsToShow             int      `mapstructure:"architecture_max_violations_to_show" yaml:"architecture_max_violations_to_show" json:"architecture_max_violations_to_show"`
 	ArchitectureCustomPatterns                  []string `mapstructure:"architecture_custom_patterns" yaml:"architecture_custom_patterns" json:"architecture_custom_patterns"`
 	ArchitectureAllowedPatterns                 []string `mapstructure:"architecture_allowed_patterns" yaml:"architecture_allowed_patterns" json:"architecture_allowed_patterns"`
 	ArchitectureForbiddenPatterns               []string `mapstructure:"architecture_forbidden_patterns" yaml:"architecture_forbidden_patterns" json:"architecture_forbidden_patterns"`
-	ArchitectureStrictMode                      *bool     `mapstructure:"architecture_strict_mode" yaml:"architecture_strict_mode" json:"architecture_strict_mode"`
-	ArchitectureFailOnViolations                *bool     `mapstructure:"architecture_fail_on_violations" yaml:"architecture_fail_on_violations" json:"architecture_fail_on_violations"`
+	ArchitectureStrictMode                      *bool    `mapstructure:"architecture_strict_mode" yaml:"architecture_strict_mode" json:"architecture_strict_mode"`
+	ArchitectureFailOnViolations                *bool    `mapstructure:"architecture_fail_on_violations" yaml:"architecture_fail_on_violations" json:"architecture_fail_on_violations"`
 
 	// SystemAnalysis Configuration (from [system_analysis] section in TOML)
 	SystemAnalysisEnabled               *bool `mapstructure:"system_analysis_enabled" yaml:"system_analysis_enabled" json:"system_analysis_enabled"`
@@ -106,25 +106,25 @@ type PyscnConfig struct {
 	SystemAnalysisGenerateUnifiedReport *bool `mapstructure:"system_analysis_generate_unified_report" yaml:"system_analysis_generate_unified_report" json:"system_analysis_generate_unified_report"`
 
 	// Dependencies Configuration (from [dependencies] section in TOML)
-	DependenciesEnabled           *bool    `mapstructure:"dependencies_enabled" yaml:"dependencies_enabled" json:"dependencies_enabled"`
-	DependenciesIncludeStdLib     *bool    `mapstructure:"dependencies_include_stdlib" yaml:"dependencies_include_stdlib" json:"dependencies_include_stdlib"`
-	DependenciesIncludeThirdParty *bool    `mapstructure:"dependencies_include_third_party" yaml:"dependencies_include_third_party" json:"dependencies_include_third_party"`
-	DependenciesFollowRelative    *bool    `mapstructure:"dependencies_follow_relative" yaml:"dependencies_follow_relative" json:"dependencies_follow_relative"`
-	DependenciesDetectCycles      *bool    `mapstructure:"dependencies_detect_cycles" yaml:"dependencies_detect_cycles" json:"dependencies_detect_cycles"`
-	DependenciesCalculateMetrics  *bool    `mapstructure:"dependencies_calculate_metrics" yaml:"dependencies_calculate_metrics" json:"dependencies_calculate_metrics"`
-	DependenciesFindLongChains    *bool    `mapstructure:"dependencies_find_long_chains" yaml:"dependencies_find_long_chains" json:"dependencies_find_long_chains"`
+	DependenciesEnabled           *bool   `mapstructure:"dependencies_enabled" yaml:"dependencies_enabled" json:"dependencies_enabled"`
+	DependenciesIncludeStdLib     *bool   `mapstructure:"dependencies_include_stdlib" yaml:"dependencies_include_stdlib" json:"dependencies_include_stdlib"`
+	DependenciesIncludeThirdParty *bool   `mapstructure:"dependencies_include_third_party" yaml:"dependencies_include_third_party" json:"dependencies_include_third_party"`
+	DependenciesFollowRelative    *bool   `mapstructure:"dependencies_follow_relative" yaml:"dependencies_follow_relative" json:"dependencies_follow_relative"`
+	DependenciesDetectCycles      *bool   `mapstructure:"dependencies_detect_cycles" yaml:"dependencies_detect_cycles" json:"dependencies_detect_cycles"`
+	DependenciesCalculateMetrics  *bool   `mapstructure:"dependencies_calculate_metrics" yaml:"dependencies_calculate_metrics" json:"dependencies_calculate_metrics"`
+	DependenciesFindLongChains    *bool   `mapstructure:"dependencies_find_long_chains" yaml:"dependencies_find_long_chains" json:"dependencies_find_long_chains"`
 	DependenciesMinCoupling       int     `mapstructure:"dependencies_min_coupling" yaml:"dependencies_min_coupling" json:"dependencies_min_coupling"`
 	DependenciesMaxCoupling       int     `mapstructure:"dependencies_max_coupling" yaml:"dependencies_max_coupling" json:"dependencies_max_coupling"`
 	DependenciesMinInstability    float64 `mapstructure:"dependencies_min_instability" yaml:"dependencies_min_instability" json:"dependencies_min_instability"`
 	DependenciesMaxDistance       float64 `mapstructure:"dependencies_max_distance" yaml:"dependencies_max_distance" json:"dependencies_max_distance"`
 	DependenciesSortBy            string  `mapstructure:"dependencies_sort_by" yaml:"dependencies_sort_by" json:"dependencies_sort_by"`
-	DependenciesShowMatrix        *bool    `mapstructure:"dependencies_show_matrix" yaml:"dependencies_show_matrix" json:"dependencies_show_matrix"`
-	DependenciesShowMetrics       *bool    `mapstructure:"dependencies_show_metrics" yaml:"dependencies_show_metrics" json:"dependencies_show_metrics"`
-	DependenciesShowChains        *bool    `mapstructure:"dependencies_show_chains" yaml:"dependencies_show_chains" json:"dependencies_show_chains"`
-	DependenciesGenerateDotGraph  *bool    `mapstructure:"dependencies_generate_dot_graph" yaml:"dependencies_generate_dot_graph" json:"dependencies_generate_dot_graph"`
+	DependenciesShowMatrix        *bool   `mapstructure:"dependencies_show_matrix" yaml:"dependencies_show_matrix" json:"dependencies_show_matrix"`
+	DependenciesShowMetrics       *bool   `mapstructure:"dependencies_show_metrics" yaml:"dependencies_show_metrics" json:"dependencies_show_metrics"`
+	DependenciesShowChains        *bool   `mapstructure:"dependencies_show_chains" yaml:"dependencies_show_chains" json:"dependencies_show_chains"`
+	DependenciesGenerateDotGraph  *bool   `mapstructure:"dependencies_generate_dot_graph" yaml:"dependencies_generate_dot_graph" json:"dependencies_generate_dot_graph"`
 	DependenciesCycleReporting    string  `mapstructure:"dependencies_cycle_reporting" yaml:"dependencies_cycle_reporting" json:"dependencies_cycle_reporting"`
 	DependenciesMaxCyclesToShow   int     `mapstructure:"dependencies_max_cycles_to_show" yaml:"dependencies_max_cycles_to_show" json:"dependencies_max_cycles_to_show"`
-	DependenciesShowCyclePaths    *bool    `mapstructure:"dependencies_show_cycle_paths" yaml:"dependencies_show_cycle_paths" json:"dependencies_show_cycle_paths"`
+	DependenciesShowCyclePaths    *bool   `mapstructure:"dependencies_show_cycle_paths" yaml:"dependencies_show_cycle_paths" json:"dependencies_show_cycle_paths"`
 }
 
 // CloneAnalysisConfig holds core analysis parameters
@@ -173,7 +173,7 @@ type FilteringConfig struct {
 type InputConfig struct {
 	// File selection
 	Paths           []string `mapstructure:"paths" yaml:"paths" json:"paths"`
-	Recursive       *bool     `mapstructure:"recursive" yaml:"recursive" json:"recursive"`
+	Recursive       *bool    `mapstructure:"recursive" yaml:"recursive" json:"recursive"`
 	IncludePatterns []string `mapstructure:"include_patterns" yaml:"include_patterns" json:"include_patterns"`
 	ExcludePatterns []string `mapstructure:"exclude_patterns" yaml:"exclude_patterns" json:"exclude_patterns"`
 }
@@ -183,12 +183,12 @@ type InputConfig struct {
 type CloneOutputConfig struct {
 	// Format and display
 	Format      string `mapstructure:"format" yaml:"format" json:"format"`
-	ShowDetails *bool   `mapstructure:"show_details" yaml:"show_details" json:"show_details"`
-	ShowContent *bool   `mapstructure:"show_content" yaml:"show_content" json:"show_content"`
+	ShowDetails *bool  `mapstructure:"show_details" yaml:"show_details" json:"show_details"`
+	ShowContent *bool  `mapstructure:"show_content" yaml:"show_content" json:"show_content"`
 
 	// Sorting and grouping
 	SortBy      string `mapstructure:"sort_by" yaml:"sort_by" json:"sort_by"`
-	GroupClones *bool   `mapstructure:"group_clones" yaml:"group_clones" json:"group_clones"`
+	GroupClones *bool  `mapstructure:"group_clones" yaml:"group_clones" json:"group_clones"`
 
 	// Output destination (not serialized)
 	Writer io.Writer `json:"-" yaml:"-" mapstructure:"-"`
@@ -197,8 +197,8 @@ type CloneOutputConfig struct {
 // PerformanceConfig holds performance-related settings
 type PerformanceConfig struct {
 	// Memory management
-	MaxMemoryMB    int  `mapstructure:"max_memory_mb" yaml:"max_memory_mb" json:"max_memory_mb"`
-	BatchSize      int  `mapstructure:"batch_size" yaml:"batch_size" json:"batch_size"`
+	MaxMemoryMB    int   `mapstructure:"max_memory_mb" yaml:"max_memory_mb" json:"max_memory_mb"`
+	BatchSize      int   `mapstructure:"batch_size" yaml:"batch_size" json:"batch_size"`
 	EnableBatching *bool `mapstructure:"enable_batching" yaml:"enable_batching" json:"enable_batching"`
 
 	// Parallelization

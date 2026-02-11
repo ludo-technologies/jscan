@@ -107,10 +107,10 @@ type AnalyzeSummary struct {
 	ArchCompliance            float64 `json:"arch_compliance" yaml:"arch_compliance"`
 
 	// Key metrics
-	TotalFunctions      int     `json:"total_functions" yaml:"total_functions"`
-	AverageComplexity   float64 `json:"average_complexity" yaml:"average_complexity"`
-	HighComplexityCount   int `json:"high_complexity_count" yaml:"high_complexity_count"`
-	MediumComplexityCount int `json:"medium_complexity_count" yaml:"medium_complexity_count"`
+	TotalFunctions        int     `json:"total_functions" yaml:"total_functions"`
+	AverageComplexity     float64 `json:"average_complexity" yaml:"average_complexity"`
+	HighComplexityCount   int     `json:"high_complexity_count" yaml:"high_complexity_count"`
+	MediumComplexityCount int     `json:"medium_complexity_count" yaml:"medium_complexity_count"`
 
 	DeadCodeCount    int `json:"dead_code_count" yaml:"dead_code_count"`
 	CriticalDeadCode int `json:"critical_dead_code" yaml:"critical_dead_code"`

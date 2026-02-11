@@ -78,7 +78,6 @@ type complexityVisitor struct {
 	decisionPoints    map[*BasicBlock]int // Track decision points per block
 	loopStatements    int
 	exceptionHandlers int
-	switchCases       int
 	logicalOperators  int
 	ternaryOperators  int
 }

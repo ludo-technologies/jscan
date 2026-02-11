@@ -28,7 +28,7 @@ const (
 	LabelFinallyBlock = "finally_block"
 
 	// Switch-related labels
-	LabelSwitchCase = "switch_case"
+	LabelSwitchCase  = "switch_case"
 	LabelSwitchMerge = "switch_merge"
 )
 
@@ -41,7 +41,6 @@ type loopContext struct {
 
 // exceptionContext tracks the context of a try block for exception handling
 type exceptionContext struct {
-	tryBlock     *BasicBlock // Try block
 	catchBlock   *BasicBlock // Catch block (optional)
 	finallyBlock *BasicBlock // Finally block (optional)
 }
@@ -73,13 +72,6 @@ func NewCFGBuilder() *CFGBuilder {
 // SetLogger sets an optional logger for error reporting
 func (b *CFGBuilder) SetLogger(logger *log.Logger) {
 	b.logger = logger
-}
-
-// logError logs an error if a logger is set
-func (b *CFGBuilder) logError(format string, args ...interface{}) {
-	if b.logger != nil {
-		b.logger.Printf("CFGBuilder: "+format, args...)
-	}
 }
 
 // Build constructs a CFG from an AST node
@@ -702,9 +694,7 @@ func (b *CFGBuilder) buildTryStatement(node *parser.Node) {
 		finallyBlock = b.newBlock(LabelFinallyBlock)
 
 		// Add finally statements
-		for _, stmt := range node.Finalizer.Body {
-			finallyBlock.Statements = append(finallyBlock.Statements, stmt)
-		}
+		finallyBlock.Statements = append(finallyBlock.Statements, node.Finalizer.Body...)
 
 		// Connect try and catch to finally
 		if tryEndBlock != nil && !b.endsWithJump(tryEndBlock) {

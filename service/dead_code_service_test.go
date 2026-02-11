@@ -231,10 +231,10 @@ func TestDeadCodeServiceBuildConfig(t *testing.T) {
 	svc := NewDeadCodeService()
 
 	req := domain.DeadCodeRequest{
-		MinSeverity:   domain.DeadCodeSeverityWarning,
-		SortBy:        domain.DeadCodeSortByFile,
-		ShowContext:   domain.BoolPtr(true),
-		ContextLines:  5,
+		MinSeverity:  domain.DeadCodeSeverityWarning,
+		SortBy:       domain.DeadCodeSortByFile,
+		ShowContext:  domain.BoolPtr(true),
+		ContextLines: 5,
 	}
 
 	config := svc.buildConfigForResponse(req)

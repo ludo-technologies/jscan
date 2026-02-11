@@ -211,7 +211,7 @@ func TestCycleSeverity(t *testing.T) {
 		size     int
 		expected domain.CycleSeverity
 	}{
-		{1, domain.CycleSeverityLow},    // Technically not a cycle, but test the logic
+		{1, domain.CycleSeverityLow}, // Technically not a cycle, but test the logic
 		{2, domain.CycleSeverityLow},
 		{3, domain.CycleSeverityMedium},
 		{4, domain.CycleSeverityMedium},
@@ -331,4 +331,3 @@ func TestGenerateCycleDescription(t *testing.T) {
 		t.Error("Expected description to mention 3 modules")
 	}
 }
-

@@ -75,8 +75,8 @@ func TestExtractFeaturesTree(t *testing.T) {
 		Label: "FunctionDeclaration",
 		Children: []*TreeNode{
 			{
-				ID:    2,
-				Label: "Identifier(foo)",
+				ID:       2,
+				Label:    "Identifier(foo)",
 				Children: []*TreeNode{},
 			},
 			{
@@ -323,12 +323,6 @@ func TestExtractPatterns(t *testing.T) {
 		"ForStatement":        true,
 		"ReturnStatement":     true,
 		"CallExpression":      true,
-	}
-
-	for _, p := range patterns {
-		if !expectedPatterns[p] {
-			// This is ok - it might have additional patterns
-		}
 	}
 
 	// Verify we got at least some expected patterns

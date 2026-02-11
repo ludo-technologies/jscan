@@ -304,20 +304,6 @@ func (r *ComplexityReporter) generateSummaryFromSerializable(results []Serializa
 	return summary
 }
 
-// generateWarnings creates warnings based on thresholds and configuration
-func (r *ComplexityReporter) generateWarnings(results []ComplexityResult) []ReportWarning {
-	// Convert interface results to common format for warning generation
-	warningData := make([]warningInfo, len(results))
-	for i, result := range results {
-		warningData[i] = warningInfo{
-			complexity:   result.GetComplexity(),
-			functionName: result.GetFunctionName(),
-			riskLevel:    result.GetRiskLevel(),
-		}
-	}
-	return r.generateWarningsCommon(warningData)
-}
-
 // generateWarningsFromSerializable creates warnings based on thresholds and configuration
 func (r *ComplexityReporter) generateWarningsFromSerializable(results []SerializableComplexityResult) []ReportWarning {
 	// Convert serializable results to common format for warning generation

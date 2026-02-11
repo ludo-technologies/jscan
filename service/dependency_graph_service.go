@@ -15,10 +15,10 @@ import (
 
 // DependencyGraphServiceImpl implements dependency graph analysis
 type DependencyGraphServiceImpl struct {
-	graphBuilderConfig  *analyzer.DependencyGraphBuilderConfig
-	couplingConfig      *analyzer.CouplingMetricsConfig
-	includeTypeImports  bool
-	includeExternal     bool
+	graphBuilderConfig *analyzer.DependencyGraphBuilderConfig
+	couplingConfig     *analyzer.CouplingMetricsConfig
+	includeTypeImports bool
+	includeExternal    bool
 }
 
 // NewDependencyGraphService creates a new dependency graph service

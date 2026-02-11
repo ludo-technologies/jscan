@@ -204,10 +204,7 @@ func (s *DeadCodeServiceImpl) convertToFunctionDeadCode(result *analyzer.DeadCod
 			BlockID:      finding.BlockID,
 		}
 
-		// Add context if requested
-		if domain.BoolValue(req.ShowContext, false) && req.ContextLines > 0 {
-			// Context would be populated here if we had the file content
-		}
+		// TODO: Add context if req.ShowContext && req.ContextLines > 0
 
 		findings = append(findings, f)
 	}
@@ -378,14 +375,14 @@ func (s *DeadCodeServiceImpl) getDeadBlocks(file domain.FileDeadCode) int {
 // buildConfigForResponse builds the configuration section for the response
 func (s *DeadCodeServiceImpl) buildConfigForResponse(req domain.DeadCodeRequest) map[string]interface{} {
 	return map[string]interface{}{
-		"min_severity":   req.MinSeverity,
-		"sort_by":        req.SortBy,
-		"show_context":   domain.BoolValue(req.ShowContext, false),
-		"context_lines":  req.ContextLines,
-		"detect_return":  domain.BoolValue(req.DetectAfterReturn, true),
-		"detect_break":   domain.BoolValue(req.DetectAfterBreak, true),
+		"min_severity":    req.MinSeverity,
+		"sort_by":         req.SortBy,
+		"show_context":    domain.BoolValue(req.ShowContext, false),
+		"context_lines":   req.ContextLines,
+		"detect_return":   domain.BoolValue(req.DetectAfterReturn, true),
+		"detect_break":    domain.BoolValue(req.DetectAfterBreak, true),
 		"detect_continue": domain.BoolValue(req.DetectAfterContinue, true),
-		"detect_raise":   domain.BoolValue(req.DetectAfterRaise, true),
+		"detect_raise":    domain.BoolValue(req.DetectAfterRaise, true),
 	}
 }
 

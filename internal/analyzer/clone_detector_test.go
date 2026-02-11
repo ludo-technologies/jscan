@@ -371,12 +371,12 @@ func TestShouldCompareFragments(t *testing.T) {
 	detector := NewCloneDetector(config)
 
 	testCases := []struct {
-		name      string
-		size1     int
-		size2     int
-		lines1    int
-		lines2    int
-		expected  bool
+		name     string
+		size1    int
+		size2    int
+		lines1   int
+		lines2   int
+		expected bool
 	}{
 		{"similar_size", 100, 100, 50, 50, true},
 		{"size_diff_50_percent", 100, 50, 50, 50, false},

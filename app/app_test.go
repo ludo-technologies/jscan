@@ -288,11 +288,11 @@ func TestFileHelperExcludeSourceMaps(t *testing.T) {
 	// Create various files including source maps
 	testFiles := []string{
 		"app.js",
-		"app.js.map",      // Source map
-		"utils.min.js",    // Minified
+		"app.js.map",       // Source map
+		"utils.min.js",     // Minified
 		"utils.min.js.map", // Minified source map
 		"lib.mjs",
-		"lib.min.mjs",     // Minified ESM
+		"lib.min.mjs", // Minified ESM
 	}
 	for _, f := range testFiles {
 		path := filepath.Join(tempDir, f)

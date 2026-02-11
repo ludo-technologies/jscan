@@ -396,8 +396,8 @@ func TestParallelExecutor_SetTimeout_InvalidValue(t *testing.T) {
 	executor := NewParallelExecutor()
 	original := executor.timeout
 
-	executor.SetTimeout(0)              // Invalid
-	executor.SetTimeout(-time.Second)   // Invalid
+	executor.SetTimeout(0)            // Invalid
+	executor.SetTimeout(-time.Second) // Invalid
 
 	executor.mu.RLock()
 	if executor.timeout != original {

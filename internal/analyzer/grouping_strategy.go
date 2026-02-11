@@ -706,9 +706,9 @@ func (c *CompleteLinkageGrouping) GroupClones(pairs []*domain.ClonePair) []*doma
 	// Find all maximal cliques using Bron-Kerbosch with pivot
 	cliques := make([][]int, 0)
 	c.bronKerbosch(
-		[]int{},                 // R: current clique
-		cloneIDs,                // P: potential candidates
-		[]int{},                 // X: excluded
+		[]int{},  // R: current clique
+		cloneIDs, // P: potential candidates
+		[]int{},  // X: excluded
 		adj,
 		&cliques,
 	)

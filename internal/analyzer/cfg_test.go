@@ -354,10 +354,7 @@ type testVisitor struct {
 
 func (v *testVisitor) VisitBlock(block *BasicBlock) bool {
 	v.visitedBlocks = append(v.visitedBlocks, block.ID)
-	if block.ID == v.stopAtBlock {
-		return false
-	}
-	return true
+	return block.ID != v.stopAtBlock
 }
 
 func (v *testVisitor) VisitEdge(edge *Edge) bool {

@@ -74,7 +74,7 @@ func (b *ASTBuilder) buildNode(tsNode *sitter.Node) *Node {
 		return b.buildForStatement(tsNode)
 	case "for_in_statement":
 		return b.buildForInStatement(tsNode)
-	case "for_of_statement":  // Proper handling for for-of
+	case "for_of_statement": // Proper handling for for-of
 		return b.buildForOfStatement(tsNode)
 	case "while_statement":
 		return b.buildWhileStatement(tsNode)
@@ -1212,9 +1212,9 @@ func (b *ASTBuilder) getChildByFieldName(tsNode *sitter.Node, fieldName string) 
 func (b *ASTBuilder) isTrivia(tsNode *sitter.Node) bool {
 	nodeType := tsNode.Type()
 	return nodeType == "comment" ||
-		   nodeType == "line_comment" ||
-		   nodeType == "block_comment" ||
-		   nodeType == ""
+		nodeType == "line_comment" ||
+		nodeType == "block_comment" ||
+		nodeType == ""
 }
 
 // isOperator checks if a node type is an operator
