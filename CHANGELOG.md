@@ -7,13 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-02-12
+
 ### Added
 
+- CLI analysis summary and modernize README ([#38](https://github.com/ludo-technologies/jscan/pull/38))
 - Detect orphan files and unused exported functions ([#37](https://github.com/ludo-technologies/jscan/pull/37))
 - Detect unused imports and exports in dead code analysis ([#36](https://github.com/ludo-technologies/jscan/pull/36))
 
 ### Fixed
 
+- Improve dependency score accuracy ([#41](https://github.com/ludo-technologies/jscan/pull/41))
+- Detect nested functions in BuildAll via recursive AST walk ([#40](https://github.com/ludo-technologies/jscan/pull/40))
+- Resolve extensionless imports in dependency graph builder ([#39](https://github.com/ludo-technologies/jscan/pull/39))
+- Resolve golangci-lint errors across codebase
 - Adjust health score thresholds and add score to text output ([#35](https://github.com/ludo-technologies/jscan/pull/35))
 
 ## [0.1.1] - 2026-02-02
@@ -63,7 +70,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - CLI with analyze command
 - Configuration file support (jscan.config.json)
 
-[Unreleased]: https://github.com/ludo-technologies/jscan/compare/v0.1.1...HEAD
+[Unreleased]: https://github.com/ludo-technologies/jscan/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/ludo-technologies/jscan/compare/v0.1.1...v0.2.0
 [0.1.1]: https://github.com/ludo-technologies/jscan/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/ludo-technologies/jscan/compare/v0.1.0-alpha...v0.1.0
 [0.1.0-alpha]: https://github.com/ludo-technologies/jscan/releases/tag/v0.1.0-alpha
