@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-02-12
+
+### Fixed
+
+- Fix version not embedded in release binaries via ldflags
+
 ## [0.2.0] - 2026-02-12
 
 ### Added
@@ -70,7 +76,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - CLI with analyze command
 - Configuration file support (jscan.config.json)
 
-[Unreleased]: https://github.com/ludo-technologies/jscan/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/ludo-technologies/jscan/compare/v0.2.1...HEAD
+[0.2.1]: https://github.com/ludo-technologies/jscan/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/ludo-technologies/jscan/compare/v0.1.1...v0.2.0
 [0.1.1]: https://github.com/ludo-technologies/jscan/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/ludo-technologies/jscan/compare/v0.1.0-alpha...v0.1.0

@@ -50,7 +50,7 @@ jobs:
             EXT=".exe"
           fi
 
-          go build -ldflags="-s -w -X main.version=${VERSION}" -o jscan${EXT} ./cmd/jscan
+          go build -ldflags="-s -w -X github.com/ludo-technologies/jscan/internal/version.Version=${VERSION}" -o jscan${EXT} ./cmd/jscan
 
           # Create archive
           ARCHIVE_NAME="jscan_${VERSION}_${{ matrix.goos }}_${{ matrix.goarch }}"

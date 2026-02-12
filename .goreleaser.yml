@@ -20,9 +20,9 @@ builds:
       - arm64
     ldflags:
       - -s -w
-      - -X main.version={{.Version}}
-      - -X main.commit={{.Commit}}
-      - -X main.date={{.Date}}
+      - -X github.com/ludo-technologies/jscan/internal/version.Version={{.Version}}
+      - -X github.com/ludo-technologies/jscan/internal/version.Commit={{.Commit}}
+      - -X github.com/ludo-technologies/jscan/internal/version.Date={{.Date}}
 
 archives:
   - format: tar.gz
