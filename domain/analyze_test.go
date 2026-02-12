@@ -86,10 +86,10 @@ func TestCalculateHealthScore_CyclePenaltyLogFloor(t *testing.T) {
 
 func TestCalculateHealthScore_MSDPenalty(t *testing.T) {
 	tests := []struct {
-		name     string
-		msd      float64
-		wantMax  int // maximum expected DependencyScore
-		wantMin  int // minimum expected DependencyScore
+		name    string
+		msd     float64
+		wantMax int // maximum expected DependencyScore
+		wantMin int // minimum expected DependencyScore
 	}{
 		{
 			name:    "zero MSD gives full score",
