@@ -54,60 +54,8 @@ func (f *OutputFormatterImpl) WriteHTML(
 		cloneResponse.ClonePairs = clonePairs
 	}
 
-	// Build summary
-	summary := &domain.AnalyzeSummary{}
-
-	if complexityResponse != nil {
-		summary.ComplexityEnabled = true
-		summary.TotalFunctions = complexityResponse.Summary.TotalFunctions
-		summary.AverageComplexity = complexityResponse.Summary.AverageComplexity
-		summary.HighComplexityCount = complexityResponse.Summary.HighRiskFunctions
-		summary.MediumComplexityCount = complexityResponse.Summary.MediumRiskFunctions
-		summary.AnalyzedFiles = complexityResponse.Summary.FilesAnalyzed
-	}
-
-	if deadCodeResponse != nil {
-		summary.DeadCodeEnabled = true
-		summary.DeadCodeCount = deadCodeResponse.Summary.TotalFindings
-		summary.CriticalDeadCode = deadCodeResponse.Summary.CriticalFindings
-		summary.WarningDeadCode = deadCodeResponse.Summary.WarningFindings
-		summary.InfoDeadCode = deadCodeResponse.Summary.InfoFindings
-		if deadCodeResponse.Summary.TotalFiles > summary.TotalFiles {
-			summary.TotalFiles = deadCodeResponse.Summary.TotalFiles
-		}
-	}
-
-	if cloneResponse != nil && cloneResponse.Statistics != nil {
-		summary.CloneEnabled = true
-		summary.TotalClones = cloneResponse.Statistics.TotalClones
-		summary.ClonePairs = cloneResponse.Statistics.TotalClonePairs
-		summary.CloneGroups = cloneResponse.Statistics.TotalCloneGroups
-		summary.CodeDuplication = calculateDuplicationPercentage(cloneResponse)
-	}
-
-	if cboResponse != nil {
-		summary.CBOEnabled = true
-		summary.CBOClasses = cboResponse.Summary.TotalClasses
-		summary.HighCouplingClasses = cboResponse.Summary.HighRiskClasses
-		summary.MediumCouplingClasses = cboResponse.Summary.MediumRiskClasses
-		summary.AverageCoupling = cboResponse.Summary.AverageCBO
-	}
-
-	if depsResponse != nil {
-		summary.DepsEnabled = true
-		if depsResponse.Graph != nil {
-			summary.DepsTotalModules = depsResponse.Graph.NodeCount()
-		}
-		if depsResponse.Analysis != nil {
-			if depsResponse.Analysis.CircularDependencies != nil {
-				summary.DepsModulesInCycles = depsResponse.Analysis.CircularDependencies.TotalModulesInCycles
-			}
-			summary.DepsMaxDepth = depsResponse.Analysis.MaxDepth
-		}
-	}
-
-	// Calculate health score
-	_ = summary.CalculateHealthScore()
+	// Build summary (reuse shared logic to avoid score divergence across output formats)
+	summary := BuildAnalyzeSummary(complexityResponse, deadCodeResponse, cloneResponse, cboResponse, depsResponse)
 
 	data := HTMLData{
 		GeneratedAt:   now.Format("2006-01-02 15:04:05"),

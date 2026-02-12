@@ -247,6 +247,9 @@ func BuildAnalyzeSummary(
 				summary.DepsModulesInCycles = depsResponse.Analysis.CircularDependencies.TotalModulesInCycles
 			}
 			summary.DepsMaxDepth = depsResponse.Analysis.MaxDepth
+			if depsResponse.Analysis.CouplingAnalysis != nil {
+				summary.DepsMainSequenceDeviation = depsResponse.Analysis.CouplingAnalysis.MainSequenceDeviation
+			}
 		}
 	}
 

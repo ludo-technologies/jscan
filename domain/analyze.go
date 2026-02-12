@@ -290,16 +290,21 @@ func (s *AnalyzeSummary) calculateDependencyPenalty() int {
 
 	penalty := 0
 
-	// Cycles penalty (max 10): proportion of modules in cycles
-	if s.DepsTotalModules > 0 {
+	// Cycles penalty (max 10): uses larger of proportion-based and log-scaled floor.
+	// The log-scaled floor ensures that circular dependencies always contribute
+	// a meaningful penalty, even in large codebases where the proportion is small.
+	if s.DepsTotalModules > 0 && s.DepsModulesInCycles > 0 {
 		ratio := float64(s.DepsModulesInCycles) / float64(s.DepsTotalModules)
-		if ratio < 0 {
-			ratio = 0
-		}
 		if ratio > 1 {
 			ratio = 1
 		}
-		penalty += int(math.Round(float64(MaxCyclesPenalty) * ratio))
+		proportionPenalty := float64(MaxCyclesPenalty) * ratio
+		logFloor := math.Log2(float64(s.DepsModulesInCycles) + 1)
+		cyclePenalty := math.Max(logFloor, proportionPenalty)
+		if cyclePenalty > float64(MaxCyclesPenalty) {
+			cyclePenalty = float64(MaxCyclesPenalty)
+		}
+		penalty += int(math.Round(cyclePenalty))
 	}
 
 	// Depth penalty (max 3): excess over expected depth ~ O(log N)
