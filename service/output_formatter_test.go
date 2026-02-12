@@ -3,6 +3,7 @@ package service
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -394,5 +395,57 @@ func TestOutputFormatterUnsupportedFormat(t *testing.T) {
 	err := formatter.Write(response, domain.OutputFormatYAML, &buf)
 	if err == nil {
 		t.Error("Expected error for unsupported format")
+	}
+}
+
+func TestBuildAnalyzeSummary_WiresMSD(t *testing.T) {
+	graph := domain.NewDependencyGraph()
+	for i := 0; i < 10; i++ {
+		graph.AddNode(&domain.ModuleNode{ID: fmt.Sprintf("mod%d", i)})
+	}
+
+	depsResponse := &domain.DependencyGraphResponse{
+		Graph: graph,
+		Analysis: &domain.DependencyAnalysisResult{
+			MaxDepth: 3,
+			CouplingAnalysis: &domain.CouplingAnalysis{
+				MainSequenceDeviation: 0.42,
+			},
+		},
+	}
+
+	summary := BuildAnalyzeSummary(nil, nil, nil, nil, depsResponse)
+
+	if summary.DepsMainSequenceDeviation != 0.42 {
+		t.Errorf("DepsMainSequenceDeviation = %f, want 0.42", summary.DepsMainSequenceDeviation)
+	}
+	if summary.DependencyScore >= 100 {
+		t.Errorf("DependencyScore should be < 100 when MSD > 0, got %d", summary.DependencyScore)
+	}
+}
+
+func TestBuildAnalyzeSummary_WiresCycles(t *testing.T) {
+	graph := domain.NewDependencyGraph()
+	for i := 0; i < 100; i++ {
+		graph.AddNode(&domain.ModuleNode{ID: fmt.Sprintf("mod%d", i)})
+	}
+
+	depsResponse := &domain.DependencyGraphResponse{
+		Graph: graph,
+		Analysis: &domain.DependencyAnalysisResult{
+			MaxDepth: 3,
+			CircularDependencies: &domain.CircularDependencyAnalysis{
+				TotalModulesInCycles: 10,
+			},
+		},
+	}
+
+	summary := BuildAnalyzeSummary(nil, nil, nil, nil, depsResponse)
+
+	if summary.DepsModulesInCycles != 10 {
+		t.Errorf("DepsModulesInCycles = %d, want 10", summary.DepsModulesInCycles)
+	}
+	if summary.DependencyScore >= 100 {
+		t.Errorf("DependencyScore should be < 100 when cycles exist, got %d", summary.DependencyScore)
 	}
 }
