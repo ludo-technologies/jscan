@@ -66,6 +66,12 @@ jobs:
           name: jscan-${{ matrix.goos }}-${{ matrix.goarch }}
           path: jscan_*
 
+      - name: Upload binary artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: binary-${{ matrix.goos }}-${{ matrix.goarch }}
+          path: jscan${{ matrix.goos == 'windows' && '.exe' || '' }}
+
   release:
     needs: build
     runs-on: ubuntu-latest
@@ -83,6 +89,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           path: dist
+          pattern: jscan-*
           merge-multiple: true
 
       - name: List artifacts
@@ -109,11 +116,68 @@ jobs:
           node-version: "20"
           registry-url: "https://registry.npmjs.org"
 
-      - name: Update package.json version
-        working-directory: ./npm
-        run: npm version ${{ needs.release.outputs.version }} --no-git-tag-version
+      - name: Download binary artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: binaries
+          pattern: binary-*
 
-      - name: Publish to npm
+      - name: Place binaries into platform packages
+        run: |
+          VERSION=${{ needs.release.outputs.version }}
+
+          # darwin-arm64
+          cp binaries/binary-darwin-arm64/jscan npm/platforms/darwin-arm64/bin/jscan
+          chmod +x npm/platforms/darwin-arm64/bin/jscan
+
+          # linux-x64
+          cp binaries/binary-linux-amd64/jscan npm/platforms/linux-x64/bin/jscan
+          chmod +x npm/platforms/linux-x64/bin/jscan
+
+          # linux-arm64
+          cp binaries/binary-linux-arm64/jscan npm/platforms/linux-arm64/bin/jscan
+          chmod +x npm/platforms/linux-arm64/bin/jscan
+
+          # windows-x64
+          cp binaries/binary-windows-amd64/jscan.exe npm/platforms/windows-x64/bin/jscan.exe
+
+      - name: Set versions on all packages
+        run: |
+          VERSION=${{ needs.release.outputs.version }}
+
+          # Update platform package versions
+          for dir in npm/platforms/*/; do
+            cd "$dir"
+            npm version "$VERSION" --no-git-tag-version
+            cd -
+          done
+
+          # Update main package version and optionalDependencies
+          cd npm
+          npm version "$VERSION" --no-git-tag-version
+
+          # Update optionalDependencies versions
+          node -e "
+            const fs = require('fs');
+            const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+            for (const dep of Object.keys(pkg.optionalDependencies)) {
+              pkg.optionalDependencies[dep] = '$VERSION';
+            }
+            fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n');
+          "
+
+      - name: Publish platform packages
+        run: |
+          for dir in npm/platforms/*/; do
+            echo "Publishing $dir..."
+            cd "$dir"
+            npm publish --access public
+            cd -
+          done
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Publish main package
         working-directory: ./npm
         run: npm publish --access public
         env:

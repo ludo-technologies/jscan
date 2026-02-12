@@ -25,19 +25,13 @@
   "bin": {
     "jscan": "./bin/jscan"
   },
-  "scripts": {
-    "postinstall": "node scripts/download-binary.js"
-  },
   "engines": {
     "node": ">=14"
   },
-  "os": [
-    "darwin",
-    "linux",
-    "win32"
-  ],
-  "cpu": [
-    "x64",
-    "arm64"
-  ]
+  "optionalDependencies": {
+    "jscan-darwin-arm64": "0.0.0",
+    "jscan-linux-arm64": "0.0.0",
+    "jscan-linux-x64": "0.0.0",
+    "jscan-windows-x64": "0.0.0"
+  }
 }
