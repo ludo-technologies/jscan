@@ -28,12 +28,12 @@ func (e *CheckExitError) Error() string {
 var (
 	checkMaxComplexity  int
 	checkAllowDeadCode  bool
-	checkSkipClones     bool
 	checkAllowCircDeps  bool
 	checkMaxCycles      int
 	checkSelectAnalyses []string
 	checkVerbose        bool
 	checkJSON           bool
+	checkConfigPath     string
 )
 
 func checkCmd() *cobra.Command {
@@ -71,8 +71,6 @@ Examples:
 		"Maximum allowed cyclomatic complexity per function")
 	cmd.Flags().BoolVar(&checkAllowDeadCode, "allow-dead-code", false,
 		"Allow dead code findings without failing")
-	cmd.Flags().BoolVar(&checkSkipClones, "skip-clones", false,
-		"Skip clone detection analysis")
 	cmd.Flags().BoolVar(&checkAllowCircDeps, "allow-circular-deps", false,
 		"Allow circular dependencies without failing")
 	cmd.Flags().IntVar(&checkMaxCycles, "max-cycles", 0,
@@ -84,6 +82,8 @@ Examples:
 		"Show detailed output")
 	cmd.Flags().BoolVar(&checkJSON, "json", false,
 		"Output results as JSON")
+	cmd.Flags().StringVarP(&checkConfigPath, "config", "c", "",
+		"Path to config file")
 
 	return cmd
 }
@@ -95,8 +95,11 @@ func runCheck(cmd *cobra.Command, args []string) error {
 
 	startTime := time.Now()
 
-	// Load default configuration
-	cfg := config.DefaultConfig()
+	// Load configuration
+	cfg, err := config.LoadConfigWithTarget(checkConfigPath, args[0])
+	if err != nil {
+		return &CheckExitError{Code: 2, Message: fmt.Sprintf("failed to load configuration: %v", err)}
+	}
 
 	// Collect JavaScript/TypeScript files (using exclude patterns from config)
 	var files []string

@@ -119,17 +119,17 @@ jscan uses JSON-based configuration files. Run `jscan init` to generate one, or 
 ```json
 {
   "complexity": {
-    "lowThreshold": 10,
-    "mediumThreshold": 20,
+    "low_threshold": 10,
+    "medium_threshold": 20,
     "enabled": true
   },
-  "deadCode": {
+  "dead_code": {
     "enabled": true,
-    "minSeverity": "warning"
+    "min_severity": "warning"
   },
   "output": {
     "format": "text",
-    "showDetails": true
+    "show_details": true
   }
 }
 ```

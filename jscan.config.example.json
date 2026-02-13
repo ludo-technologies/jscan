@@ -1,34 +1,32 @@
 {
-  "$schema": "https://json-schema.org/draft-07/schema#",
-  "title": "jscan Configuration",
-  "description": "Configuration for jscan - JavaScript/TypeScript static analyzer",
-  
   "complexity": {
-    "lowThreshold": 10,
-    "mediumThreshold": 20,
-    "maxComplexity": 0,
+    "low_threshold": 10,
+    "medium_threshold": 20,
+    "max_complexity": 0,
     "enabled": true,
-    "reportUnchanged": false
+    "report_unchanged": false
   },
-  
-  "deadCode": {
+  "dead_code": {
     "enabled": true,
-    "minSeverity": "warning",
-    "detectAfterReturn": true,
-    "detectAfterBreak": true,
-    "detectAfterContinue": true,
-    "detectAfterThrow": true,
-    "detectUnreachableBranches": true
+    "min_severity": "warning",
+    "show_context": false,
+    "context_lines": 3,
+    "sort_by": "severity",
+    "detect_after_return": true,
+    "detect_after_break": true,
+    "detect_after_continue": true,
+    "detect_after_raise": true,
+    "detect_unreachable_branches": true,
+    "ignore_patterns": []
   },
-  
   "output": {
     "format": "text",
-    "showDetails": true,
-    "colorize": true
+    "show_details": true,
+    "sort_by": "complexity",
+    "min_complexity": 1
   },
-  
   "analysis": {
-    "include": [
+    "include_patterns": [
       "**/*.js",
       "**/*.jsx",
       "**/*.ts",
@@ -36,14 +34,14 @@
       "**/*.mjs",
       "**/*.cjs"
     ],
-    "exclude": [
-      "**/node_modules/**",
-      "**/dist/**",
-      "**/build/**",
-      "**/*.min.js",
-      "**/*.bundle.js"
+    "exclude_patterns": [
+      "node_modules",
+      "dist",
+      "build",
+      "*.min.js",
+      "*.bundle.js"
     ],
-    "maxFileSize": 1000,
-    "workers": 0
+    "recursive": true,
+    "follow_symlinks": false
   }
 }

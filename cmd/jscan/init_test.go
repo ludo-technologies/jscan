@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -43,11 +44,11 @@ func TestInitCommand_BasicConfigCreation(t *testing.T) {
 	contentStr := string(content)
 	expectedSections := []string{
 		"complexity",
-		"deadCode",
+		"dead_code",
 		"output",
 		"analysis",
-		"lowThreshold",
-		"mediumThreshold",
+		"low_threshold",
+		"medium_threshold",
 	}
 
 	for _, section := range expectedSections {
@@ -134,13 +135,13 @@ func TestInitCommand_MinimalConfig(t *testing.T) {
 		t.Error("Minimal config missing complexity section")
 	}
 
-	if !strings.Contains(contentStr, "deadCode") {
-		t.Error("Minimal config missing deadCode section")
+	if !strings.Contains(contentStr, "dead_code") {
+		t.Error("Minimal config missing dead_code section")
 	}
 
-	// Minimal config should have the minimal comment
-	if !strings.Contains(contentStr, "minimal") {
-		t.Error("Minimal config should indicate it's minimal")
+	// Generated config must be valid JSON
+	if !json.Valid(content) {
+		t.Error("Minimal config should be valid JSON")
 	}
 }
 
@@ -229,23 +230,23 @@ func TestGetFullConfigTemplate(t *testing.T) {
 		{
 			projectType: config.ProjectTypeGeneric,
 			strictness:  config.StrictnessStandard,
-			wantLow:     `"lowThreshold": 10`,
-			wantMedium:  `"mediumThreshold": 20`,
-			wantMax:     `"maxComplexity": 0`,
+			wantLow:     `"low_threshold": 10`,
+			wantMedium:  `"medium_threshold": 20`,
+			wantMax:     `"max_complexity": 0`,
 		},
 		{
 			projectType: config.ProjectTypeReact,
 			strictness:  config.StrictnessStrict,
-			wantLow:     `"lowThreshold": 5`,
-			wantMedium:  `"mediumThreshold": 10`,
-			wantMax:     `"maxComplexity": 15`,
+			wantLow:     `"low_threshold": 5`,
+			wantMedium:  `"medium_threshold": 10`,
+			wantMax:     `"max_complexity": 15`,
 		},
 		{
 			projectType: config.ProjectTypeVue,
 			strictness:  config.StrictnessRelaxed,
-			wantLow:     `"lowThreshold": 15`,
-			wantMedium:  `"mediumThreshold": 30`,
-			wantMax:     `"maxComplexity": 0`,
+			wantLow:     `"low_threshold": 15`,
+			wantMedium:  `"medium_threshold": 30`,
+			wantMax:     `"max_complexity": 0`,
 		},
 	}
 
@@ -274,12 +275,12 @@ func TestGetMinimalConfigTemplate(t *testing.T) {
 	// Check essential sections exist
 	requiredSections := []string{
 		"complexity",
-		"deadCode",
+		"dead_code",
 		"analysis",
-		"lowThreshold",
-		"mediumThreshold",
-		"include",
-		"exclude",
+		"low_threshold",
+		"medium_threshold",
+		"include_patterns",
+		"exclude_patterns",
 	}
 
 	for _, section := range requiredSections {
@@ -381,26 +382,23 @@ func TestStrictnessPresets(t *testing.T) {
 	}
 }
 
-func TestConfigTemplateHasComments(t *testing.T) {
+func TestConfigTemplateIsValidJSON(t *testing.T) {
 	template := config.GetFullConfigTemplate(config.ProjectTypeGeneric, config.StrictnessStandard)
 
-	// JSONC templates should have comments
-	if !strings.Contains(template, "//") {
-		t.Error("Full template should contain JSONC comments")
+	if !json.Valid([]byte(template)) {
+		t.Fatal("Full template should be valid JSON")
 	}
 
-	// Check for documentation sections
-	expectedComments := []string{
-		"COMPLEXITY ANALYSIS",
-		"DEAD CODE DETECTION",
-		"OUTPUT SETTINGS",
-		"ANALYSIS SCOPE",
-		"github.com/ludo-technologies/jscan",
+	unexpectedLegacyKeys := []string{
+		"showDetails",
+		"minSeverity",
+		"include\":",
+		"exclude\":",
 	}
 
-	for _, comment := range expectedComments {
-		if !strings.Contains(template, comment) {
-			t.Errorf("Template missing expected comment/section: %s", comment)
+	for _, key := range unexpectedLegacyKeys {
+		if strings.Contains(template, key) {
+			t.Errorf("Template should not contain legacy key format: %s", key)
 		}
 	}
 }

@@ -363,10 +363,20 @@ func searchConfigInDirectory(dir string, candidates []string) string {
 	return ""
 }
 
-// findDefaultConfig looks for default configuration files in common locations
-// targetPath is the path being analyzed (e.g., the Python file or directory)
+// findDefaultConfig looks for default configuration files in common locations.
+// targetPath is the path being analyzed.
 func findDefaultConfig(targetPath string) string {
 	candidates := []string{
+		"jscan.config.json",
+		".jscanrc.json",
+		".jscanrc",
+		"jscan.yaml",
+		"jscan.yml",
+		".jscan.toml",
+		".jscan.yml",
+		"jscan.json",
+		".jscan.json",
+		// Legacy pyscn names (kept for backward compatibility)
 		"pyscn.yaml",
 		"pyscn.yml",
 		".pyscn.toml",
@@ -412,15 +422,25 @@ func findDefaultConfig(targetPath string) string {
 
 	// Check XDG config directory (Linux/Mac standard)
 	if xdgConfig := os.Getenv("XDG_CONFIG_HOME"); xdgConfig != "" {
+		if config := searchConfigInDirectory(filepath.Join(xdgConfig, "jscan"), candidates); config != "" {
+			return config
+		}
+		// Legacy directory
 		if config := searchConfigInDirectory(filepath.Join(xdgConfig, "pyscn"), candidates); config != "" {
 			return config
 		}
 	}
 
-	// Check ~/.config/pyscn/ (XDG default)
+	// Check ~/.config/jscan/ (XDG default)
 	if home, err := os.UserHomeDir(); err == nil {
-		configDir := filepath.Join(home, ".config", "pyscn")
+		configDir := filepath.Join(home, ".config", "jscan")
 		if config := searchConfigInDirectory(configDir, candidates); config != "" {
+			return config
+		}
+
+		// Legacy directory
+		legacyConfigDir := filepath.Join(home, ".config", "pyscn")
+		if config := searchConfigInDirectory(legacyConfigDir, candidates); config != "" {
 			return config
 		}
 
@@ -430,7 +450,14 @@ func findDefaultConfig(targetPath string) string {
 		}
 	}
 
-	// Check PYSCN_CONFIG environment variable as fallback
+	// Check JSCAN_CONFIG environment variable as fallback.
+	// Keep PYSCN_CONFIG for backward compatibility.
+	if envConfig := os.Getenv("JSCAN_CONFIG"); envConfig != "" {
+		if _, err := os.Stat(envConfig); err == nil {
+			return envConfig
+		}
+	}
+
 	if envConfig := os.Getenv("PYSCN_CONFIG"); envConfig != "" {
 		if _, err := os.Stat(envConfig); err == nil {
 			return envConfig
