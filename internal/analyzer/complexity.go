@@ -112,6 +112,7 @@ func CalculateComplexityWithConfig(cfg *corecfg.CFG, complexityConfig *config.Co
 	return &ComplexityResult{
 		Complexity:        complexity,
 		Edges:             totalEdges,
+		Nodes:             cfg.Size(),
 		IfStatements:      coreResult.DecisionPoints,
 		LoopStatements:    loopStatements,
 		ExceptionHandlers: exceptionHandlers,

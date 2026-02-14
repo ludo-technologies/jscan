@@ -81,7 +81,10 @@ func (c *Clone) ItemID() int { return c.ID }
 
 // ItemKey implements clone.GroupableItem for codescan-core grouping.
 func (c *Clone) ItemKey() string {
-	if c == nil || c.Location == nil {
+	if c == nil {
+		return "0"
+	}
+	if c.Location == nil {
 		return fmt.Sprintf("%d", c.ID)
 	}
 	return fmt.Sprintf("%s|%d|%d|%d|%d",

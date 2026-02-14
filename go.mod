@@ -34,4 +34,5 @@ require (
 	golang.org/x/text v0.28.0 // indirect
 )
 
+// TODO: remove replace once codescan-core v0.1.0 is published to a Go module proxy
 replace github.com/ludo-technologies/codescan-core => ../codescan-core
