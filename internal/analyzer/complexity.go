@@ -28,9 +28,9 @@ type ComplexityResult struct {
 	RiskLevel           string
 }
 
-func (cr *ComplexityResult) GetComplexity() int    { return cr.Complexity }
+func (cr *ComplexityResult) GetComplexity() int      { return cr.Complexity }
 func (cr *ComplexityResult) GetFunctionName() string { return cr.FunctionName }
-func (cr *ComplexityResult) GetRiskLevel() string  { return cr.RiskLevel }
+func (cr *ComplexityResult) GetRiskLevel() string    { return cr.RiskLevel }
 
 func (cr *ComplexityResult) GetDetailedMetrics() map[string]int {
 	return map[string]int{

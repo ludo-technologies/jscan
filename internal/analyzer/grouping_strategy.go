@@ -120,8 +120,10 @@ func NewConnectedGrouping(threshold float64) *ConnectedGrouping {
 	}
 }
 
-func (c *ConnectedGrouping) GetName() string                                       { return c.adapter.GetName() }
-func (c *ConnectedGrouping) GroupClones(pairs []*domain.ClonePair) []*domain.CloneGroup { return c.adapter.GroupClones(pairs) }
+func (c *ConnectedGrouping) GetName() string { return c.adapter.GetName() }
+func (c *ConnectedGrouping) GroupClones(pairs []*domain.ClonePair) []*domain.CloneGroup {
+	return c.adapter.GroupClones(pairs)
+}
 
 // ---------------------------------------------------------------------------
 // KCoreGrouping wraps codescan-core k-core decomposition
@@ -149,8 +151,10 @@ func NewKCoreGrouping(threshold float64, k int) *KCoreGrouping {
 	}
 }
 
-func (kg *KCoreGrouping) GetName() string                                       { return kg.adapter.GetName() }
-func (kg *KCoreGrouping) GroupClones(pairs []*domain.ClonePair) []*domain.CloneGroup { return kg.adapter.GroupClones(pairs) }
+func (kg *KCoreGrouping) GetName() string { return kg.adapter.GetName() }
+func (kg *KCoreGrouping) GroupClones(pairs []*domain.ClonePair) []*domain.CloneGroup {
+	return kg.adapter.GroupClones(pairs)
+}
 
 // ---------------------------------------------------------------------------
 // StarMedoidGrouping wraps codescan-core star/medoid grouping
@@ -172,8 +176,10 @@ func NewStarMedoidGrouping(threshold float64) *StarMedoidGrouping {
 	}
 }
 
-func (s *StarMedoidGrouping) GetName() string                                       { return s.adapter.GetName() }
-func (s *StarMedoidGrouping) GroupClones(pairs []*domain.ClonePair) []*domain.CloneGroup { return s.adapter.GroupClones(pairs) }
+func (s *StarMedoidGrouping) GetName() string { return s.adapter.GetName() }
+func (s *StarMedoidGrouping) GroupClones(pairs []*domain.ClonePair) []*domain.CloneGroup {
+	return s.adapter.GroupClones(pairs)
+}
 
 // ---------------------------------------------------------------------------
 // CompleteLinkageGrouping wraps codescan-core complete linkage (Bron-Kerbosch)
@@ -195,8 +201,10 @@ func NewCompleteLinkageGrouping(threshold float64) *CompleteLinkageGrouping {
 	}
 }
 
-func (c *CompleteLinkageGrouping) GetName() string                                       { return c.adapter.GetName() }
-func (c *CompleteLinkageGrouping) GroupClones(pairs []*domain.ClonePair) []*domain.CloneGroup { return c.adapter.GroupClones(pairs) }
+func (c *CompleteLinkageGrouping) GetName() string { return c.adapter.GetName() }
+func (c *CompleteLinkageGrouping) GroupClones(pairs []*domain.ClonePair) []*domain.CloneGroup {
+	return c.adapter.GroupClones(pairs)
+}
 
 // ---------------------------------------------------------------------------
 // CentroidGrouping wraps codescan-core centroid grouping
@@ -218,8 +226,10 @@ func NewCentroidGrouping(threshold float64) *CentroidGrouping {
 	}
 }
 
-func (cg *CentroidGrouping) GetName() string                                       { return cg.adapter.GetName() }
-func (cg *CentroidGrouping) GroupClones(pairs []*domain.ClonePair) []*domain.CloneGroup { return cg.adapter.GroupClones(pairs) }
+func (cg *CentroidGrouping) GetName() string { return cg.adapter.GetName() }
+func (cg *CentroidGrouping) GroupClones(pairs []*domain.ClonePair) []*domain.CloneGroup {
+	return cg.adapter.GroupClones(pairs)
+}
 
 // ---------------------------------------------------------------------------
 // Helper functions
