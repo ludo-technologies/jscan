@@ -3,11 +3,12 @@ package analyzer
 import (
 	"testing"
 
+	corecfg "github.com/ludo-technologies/codescan-core/cfg"
 	"github.com/ludo-technologies/jscan/internal/parser"
 )
 
 func TestNewReachabilityAnalyzer(t *testing.T) {
-	cfg := NewCFG("test")
+	cfg := corecfg.NewCFG("test")
 	analyzer := NewReachabilityAnalyzer(cfg)
 
 	if analyzer == nil {
@@ -37,9 +38,9 @@ func TestReachabilityAnalyzer_AnalyzeReachability_NilCFG(t *testing.T) {
 }
 
 func TestReachabilityAnalyzer_AnalyzeReachability_EmptyCFG(t *testing.T) {
-	cfg := &CFG{
+	cfg := &corecfg.CFG{
 		Name:   "empty",
-		Blocks: make(map[string]*BasicBlock),
+		Blocks: make(map[string]*corecfg.BasicBlock),
 		Entry:  nil,
 	}
 	analyzer := NewReachabilityAnalyzer(cfg)
@@ -54,8 +55,8 @@ func TestReachabilityAnalyzer_AnalyzeReachability_EmptyCFG(t *testing.T) {
 }
 
 func TestReachabilityAnalyzer_AnalyzeReachability_SimpleCFG(t *testing.T) {
-	cfg := NewCFG("simple")
-	cfg.ConnectBlocks(cfg.Entry, cfg.Exit, EdgeNormal)
+	cfg := corecfg.NewCFG("simple")
+	cfg.ConnectBlocks(cfg.Entry, cfg.Exit, corecfg.EdgeNormal)
 
 	analyzer := NewReachabilityAnalyzer(cfg)
 	result := analyzer.AnalyzeReachability()
@@ -75,12 +76,12 @@ func TestReachabilityAnalyzer_AnalyzeReachability_SimpleCFG(t *testing.T) {
 }
 
 func TestReachabilityAnalyzer_AnalyzeReachability_WithUnreachable(t *testing.T) {
-	cfg := NewCFG("test")
+	cfg := corecfg.NewCFG("test")
 	reachableBlock := cfg.CreateBlock("reachable")
 	unreachableBlock := cfg.CreateBlock("unreachable")
 
-	cfg.ConnectBlocks(cfg.Entry, reachableBlock, EdgeNormal)
-	cfg.ConnectBlocks(reachableBlock, cfg.Exit, EdgeNormal)
+	cfg.ConnectBlocks(cfg.Entry, reachableBlock, corecfg.EdgeNormal)
+	cfg.ConnectBlocks(reachableBlock, cfg.Exit, corecfg.EdgeNormal)
 	// unreachableBlock is not connected - should be detected
 
 	analyzer := NewReachabilityAnalyzer(cfg)
@@ -95,14 +96,14 @@ func TestReachabilityAnalyzer_AnalyzeReachability_WithUnreachable(t *testing.T) 
 }
 
 func TestReachabilityAnalyzer_AnalyzeReachabilityFrom(t *testing.T) {
-	cfg := NewCFG("test")
+	cfg := corecfg.NewCFG("test")
 	block1 := cfg.CreateBlock("block1")
 	block2 := cfg.CreateBlock("block2")
 	block3 := cfg.CreateBlock("block3")
 
-	cfg.ConnectBlocks(cfg.Entry, block1, EdgeNormal)
-	cfg.ConnectBlocks(block1, block2, EdgeNormal)
-	cfg.ConnectBlocks(block2, cfg.Exit, EdgeNormal)
+	cfg.ConnectBlocks(cfg.Entry, block1, corecfg.EdgeNormal)
+	cfg.ConnectBlocks(block1, block2, corecfg.EdgeNormal)
+	cfg.ConnectBlocks(block2, cfg.Exit, corecfg.EdgeNormal)
 	// block3 is disconnected
 
 	analyzer := NewReachabilityAnalyzer(cfg)
@@ -125,7 +126,7 @@ func TestReachabilityAnalyzer_AnalyzeReachabilityFrom(t *testing.T) {
 }
 
 func TestReachabilityAnalyzer_AnalyzeReachabilityFrom_NilStart(t *testing.T) {
-	cfg := NewCFG("test")
+	cfg := corecfg.NewCFG("test")
 	analyzer := NewReachabilityAnalyzer(cfg)
 
 	result := analyzer.AnalyzeReachabilityFrom(nil)
@@ -140,7 +141,7 @@ func TestReachabilityAnalyzer_AnalyzeReachabilityFrom_NilStart(t *testing.T) {
 
 func TestReachabilityAnalyzer_AnalyzeReachabilityFrom_NilCFG(t *testing.T) {
 	analyzer := &ReachabilityAnalyzer{cfg: nil}
-	startBlock := NewBasicBlock("start")
+	startBlock := corecfg.NewBasicBlock("start")
 
 	result := analyzer.AnalyzeReachabilityFrom(startBlock)
 
@@ -153,12 +154,12 @@ func TestReachabilityAnalyzer_AnalyzeReachabilityFrom_NilCFG(t *testing.T) {
 }
 
 func TestReachabilityResult_GetUnreachableBlocksWithStatements(t *testing.T) {
-	emptyBlock := NewBasicBlock("empty")
-	blockWithStmt := NewBasicBlock("with_stmt")
+	emptyBlock := corecfg.NewBasicBlock("empty")
+	blockWithStmt := corecfg.NewBasicBlock("with_stmt")
 	blockWithStmt.AddStatement(&parser.Node{Type: parser.NodeExpressionStatement})
 
 	result := &ReachabilityResult{
-		UnreachableBlocks: map[string]*BasicBlock{
+		UnreachableBlocks: map[string]*corecfg.BasicBlock{
 			"empty":     emptyBlock,
 			"with_stmt": blockWithStmt,
 		},
@@ -206,16 +207,16 @@ func TestReachabilityResult_GetReachabilityRatio(t *testing.T) {
 func TestReachabilityResult_HasUnreachableCode(t *testing.T) {
 	// No unreachable blocks
 	noUnreachable := &ReachabilityResult{
-		UnreachableBlocks: map[string]*BasicBlock{},
+		UnreachableBlocks: map[string]*corecfg.BasicBlock{},
 	}
 	if noUnreachable.HasUnreachableCode() {
 		t.Error("Should not have unreachable code with empty unreachable blocks")
 	}
 
 	// Only empty unreachable blocks
-	emptyBlock := NewBasicBlock("empty")
+	emptyBlock := corecfg.NewBasicBlock("empty")
 	onlyEmptyUnreachable := &ReachabilityResult{
-		UnreachableBlocks: map[string]*BasicBlock{
+		UnreachableBlocks: map[string]*corecfg.BasicBlock{
 			"empty": emptyBlock,
 		},
 	}
@@ -224,10 +225,10 @@ func TestReachabilityResult_HasUnreachableCode(t *testing.T) {
 	}
 
 	// Unreachable block with statements
-	blockWithStmt := NewBasicBlock("with_stmt")
+	blockWithStmt := corecfg.NewBasicBlock("with_stmt")
 	blockWithStmt.AddStatement(&parser.Node{Type: parser.NodeExpressionStatement})
 	hasUnreachable := &ReachabilityResult{
-		UnreachableBlocks: map[string]*BasicBlock{
+		UnreachableBlocks: map[string]*corecfg.BasicBlock{
 			"with_stmt": blockWithStmt,
 		},
 	}
@@ -238,10 +239,10 @@ func TestReachabilityResult_HasUnreachableCode(t *testing.T) {
 
 func TestReachabilityVisitor(t *testing.T) {
 	visitor := &reachabilityVisitor{
-		reachableBlocks: make(map[string]*BasicBlock),
+		reachableBlocks: make(map[string]*corecfg.BasicBlock),
 	}
 
-	block := NewBasicBlock("test")
+	block := corecfg.NewBasicBlock("test")
 
 	// VisitBlock should mark block as reachable
 	result := visitor.VisitBlock(block)
@@ -259,7 +260,7 @@ func TestReachabilityVisitor(t *testing.T) {
 	}
 
 	// VisitEdge should always return true
-	edge := &Edge{}
+	edge := &corecfg.Edge{}
 	result = visitor.VisitEdge(edge)
 	if !result {
 		t.Error("VisitEdge should return true")
@@ -267,14 +268,14 @@ func TestReachabilityVisitor(t *testing.T) {
 }
 
 func TestReachabilityAnalyzer_CyclicGraph(t *testing.T) {
-	cfg := NewCFG("cyclic")
+	cfg := corecfg.NewCFG("cyclic")
 	loopHeader := cfg.CreateBlock("loop_header")
 	loopBody := cfg.CreateBlock("loop_body")
 
-	cfg.ConnectBlocks(cfg.Entry, loopHeader, EdgeNormal)
-	cfg.ConnectBlocks(loopHeader, loopBody, EdgeCondTrue)
-	cfg.ConnectBlocks(loopHeader, cfg.Exit, EdgeCondFalse)
-	cfg.ConnectBlocks(loopBody, loopHeader, EdgeLoop) // Back edge
+	cfg.ConnectBlocks(cfg.Entry, loopHeader, corecfg.EdgeNormal)
+	cfg.ConnectBlocks(loopHeader, loopBody, corecfg.EdgeCondTrue)
+	cfg.ConnectBlocks(loopHeader, cfg.Exit, corecfg.EdgeCondFalse)
+	cfg.ConnectBlocks(loopBody, loopHeader, corecfg.EdgeLoop) // Back edge
 
 	analyzer := NewReachabilityAnalyzer(cfg)
 	result := analyzer.AnalyzeReachability()
@@ -346,11 +347,11 @@ func TestReachabilityAnalyzer_AllPathsReturn(t *testing.T) {
 }
 
 func TestReachabilityAnalyzer_blockContainsReturn(t *testing.T) {
-	cfg := NewCFG("test")
+	cfg := corecfg.NewCFG("test")
 	analyzer := NewReachabilityAnalyzer(cfg)
 
 	// Block with return
-	blockWithReturn := NewBasicBlock("with_return")
+	blockWithReturn := corecfg.NewBasicBlock("with_return")
 	blockWithReturn.AddStatement(&parser.Node{Type: parser.NodeReturnStatement})
 
 	if !analyzer.blockContainsReturn(blockWithReturn) {
@@ -358,7 +359,7 @@ func TestReachabilityAnalyzer_blockContainsReturn(t *testing.T) {
 	}
 
 	// Block without return
-	blockWithoutReturn := NewBasicBlock("without_return")
+	blockWithoutReturn := corecfg.NewBasicBlock("without_return")
 	blockWithoutReturn.AddStatement(&parser.Node{Type: parser.NodeExpressionStatement})
 
 	if analyzer.blockContainsReturn(blockWithoutReturn) {
@@ -366,7 +367,7 @@ func TestReachabilityAnalyzer_blockContainsReturn(t *testing.T) {
 	}
 
 	// Empty block
-	emptyBlock := NewBasicBlock("empty")
+	emptyBlock := corecfg.NewBasicBlock("empty")
 	if analyzer.blockContainsReturn(emptyBlock) {
 		t.Error("Empty block should not contain return")
 	}
@@ -401,8 +402,8 @@ func TestCopyVisited(t *testing.T) {
 }
 
 func TestReachabilityResult_AnalysisTime(t *testing.T) {
-	cfg := NewCFG("test")
-	cfg.ConnectBlocks(cfg.Entry, cfg.Exit, EdgeNormal)
+	cfg := corecfg.NewCFG("test")
+	cfg.ConnectBlocks(cfg.Entry, cfg.Exit, corecfg.EdgeNormal)
 
 	analyzer := NewReachabilityAnalyzer(cfg)
 	result := analyzer.AnalyzeReachability()

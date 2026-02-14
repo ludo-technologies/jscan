@@ -3,23 +3,24 @@ package analyzer
 import (
 	"testing"
 
+	corecfg "github.com/ludo-technologies/codescan-core/cfg"
 	"github.com/ludo-technologies/jscan/internal/parser"
 )
 
 func TestEdgeType_String(t *testing.T) {
 	tests := []struct {
-		edgeType EdgeType
+		edgeType corecfg.EdgeType
 		expected string
 	}{
-		{EdgeNormal, "normal"},
-		{EdgeCondTrue, "true"},
-		{EdgeCondFalse, "false"},
-		{EdgeException, "exception"},
-		{EdgeLoop, "loop"},
-		{EdgeBreak, "break"},
-		{EdgeContinue, "continue"},
-		{EdgeReturn, "return"},
-		{EdgeType(100), "unknown"},
+		{corecfg.EdgeNormal, "normal"},
+		{corecfg.EdgeCondTrue, "true"},
+		{corecfg.EdgeCondFalse, "false"},
+		{corecfg.EdgeException, "exception"},
+		{corecfg.EdgeLoop, "loop"},
+		{corecfg.EdgeBreak, "break"},
+		{corecfg.EdgeContinue, "continue"},
+		{corecfg.EdgeReturn, "return"},
+		{corecfg.EdgeType(100), "unknown"},
 	}
 
 	for _, tc := range tests {
@@ -31,7 +32,7 @@ func TestEdgeType_String(t *testing.T) {
 }
 
 func TestNewBasicBlock(t *testing.T) {
-	block := NewBasicBlock("test_block")
+	block := corecfg.NewBasicBlock("test_block")
 
 	if block.ID != "test_block" {
 		t.Errorf("Expected ID 'test_block', got %s", block.ID)
@@ -54,7 +55,7 @@ func TestNewBasicBlock(t *testing.T) {
 }
 
 func TestBasicBlock_AddStatement(t *testing.T) {
-	block := NewBasicBlock("test")
+	block := corecfg.NewBasicBlock("test")
 
 	// Add nil statement - should be ignored
 	block.AddStatement(nil)
@@ -74,10 +75,10 @@ func TestBasicBlock_AddStatement(t *testing.T) {
 }
 
 func TestBasicBlock_AddSuccessor(t *testing.T) {
-	block1 := NewBasicBlock("block1")
-	block2 := NewBasicBlock("block2")
+	block1 := corecfg.NewBasicBlock("block1")
+	block2 := corecfg.NewBasicBlock("block2")
 
-	edge := block1.AddSuccessor(block2, EdgeNormal)
+	edge := block1.AddSuccessor(block2, corecfg.EdgeNormal)
 
 	// Check edge properties
 	if edge.From != block1 {
@@ -86,7 +87,7 @@ func TestBasicBlock_AddSuccessor(t *testing.T) {
 	if edge.To != block2 {
 		t.Error("Edge To should be block2")
 	}
-	if edge.Type != EdgeNormal {
+	if edge.Type != corecfg.EdgeNormal {
 		t.Errorf("Edge type should be EdgeNormal, got %s", edge.Type)
 	}
 
@@ -102,12 +103,12 @@ func TestBasicBlock_AddSuccessor(t *testing.T) {
 }
 
 func TestBasicBlock_RemoveSuccessor(t *testing.T) {
-	block1 := NewBasicBlock("block1")
-	block2 := NewBasicBlock("block2")
-	block3 := NewBasicBlock("block3")
+	block1 := corecfg.NewBasicBlock("block1")
+	block2 := corecfg.NewBasicBlock("block2")
+	block3 := corecfg.NewBasicBlock("block3")
 
-	block1.AddSuccessor(block2, EdgeNormal)
-	block1.AddSuccessor(block3, EdgeCondTrue)
+	block1.AddSuccessor(block2, corecfg.EdgeNormal)
+	block1.AddSuccessor(block3, corecfg.EdgeCondTrue)
 
 	// Remove block2 as successor
 	block1.RemoveSuccessor(block2)
@@ -124,7 +125,7 @@ func TestBasicBlock_RemoveSuccessor(t *testing.T) {
 }
 
 func TestBasicBlock_IsEmpty(t *testing.T) {
-	block := NewBasicBlock("test")
+	block := corecfg.NewBasicBlock("test")
 
 	if !block.IsEmpty() {
 		t.Error("New block should be empty")
@@ -139,7 +140,7 @@ func TestBasicBlock_IsEmpty(t *testing.T) {
 
 func TestBasicBlock_String(t *testing.T) {
 	// Entry block
-	entry := NewBasicBlock("bb0")
+	entry := corecfg.NewBasicBlock("bb0")
 	entry.IsEntry = true
 	entry.Label = "ENTRY"
 	if entry.String() != "[ENTRY: ENTRY]" {
@@ -147,7 +148,7 @@ func TestBasicBlock_String(t *testing.T) {
 	}
 
 	// Exit block
-	exit := NewBasicBlock("bb1")
+	exit := corecfg.NewBasicBlock("bb1")
 	exit.IsExit = true
 	exit.Label = "EXIT"
 	if exit.String() != "[EXIT: EXIT]" {
@@ -155,7 +156,7 @@ func TestBasicBlock_String(t *testing.T) {
 	}
 
 	// Regular block with label
-	regular := NewBasicBlock("bb2")
+	regular := corecfg.NewBasicBlock("bb2")
 	regular.Label = "test_label"
 	regular.AddStatement(&parser.Node{Type: parser.NodeExpressionStatement})
 	regular.AddStatement(&parser.Node{Type: parser.NodeExpressionStatement})
@@ -164,14 +165,14 @@ func TestBasicBlock_String(t *testing.T) {
 	}
 
 	// Block without label
-	noLabel := NewBasicBlock("bb3")
+	noLabel := corecfg.NewBasicBlock("bb3")
 	if noLabel.String() != "[bb3: 0 stmts]" {
 		t.Errorf("No label block string incorrect: %s", noLabel.String())
 	}
 }
 
 func TestNewCFG(t *testing.T) {
-	cfg := NewCFG("test_function")
+	cfg := corecfg.NewCFG("test_function")
 
 	if cfg.Name != "test_function" {
 		t.Errorf("Expected name 'test_function', got %s", cfg.Name)
@@ -200,7 +201,7 @@ func TestNewCFG(t *testing.T) {
 }
 
 func TestCFG_CreateBlock(t *testing.T) {
-	cfg := NewCFG("test")
+	cfg := corecfg.NewCFG("test")
 
 	block1 := cfg.CreateBlock("block1")
 	if block1.Label != "block1" {
@@ -222,14 +223,14 @@ func TestCFG_CreateBlock(t *testing.T) {
 }
 
 func TestCFG_AddBlock(t *testing.T) {
-	cfg := NewCFG("test")
+	cfg := corecfg.NewCFG("test")
 
 	// Add nil block - should be ignored
 	cfg.AddBlock(nil)
 	initialSize := cfg.Size()
 
 	// Add existing block
-	block := NewBasicBlock("external_block")
+	block := corecfg.NewBasicBlock("external_block")
 	cfg.AddBlock(block)
 	if cfg.Blocks["external_block"] != block {
 		t.Error("Block should be added to CFG")
@@ -240,12 +241,12 @@ func TestCFG_AddBlock(t *testing.T) {
 }
 
 func TestCFG_RemoveBlock(t *testing.T) {
-	cfg := NewCFG("test")
+	cfg := corecfg.NewCFG("test")
 	block := cfg.CreateBlock("removable")
 
 	// Connect blocks
-	cfg.ConnectBlocks(cfg.Entry, block, EdgeNormal)
-	cfg.ConnectBlocks(block, cfg.Exit, EdgeNormal)
+	cfg.ConnectBlocks(cfg.Entry, block, corecfg.EdgeNormal)
+	cfg.ConnectBlocks(block, cfg.Exit, corecfg.EdgeNormal)
 
 	initialSize := cfg.Size()
 	cfg.RemoveBlock(block)
@@ -273,11 +274,11 @@ func TestCFG_RemoveBlock(t *testing.T) {
 }
 
 func TestCFG_ConnectBlocks(t *testing.T) {
-	cfg := NewCFG("test")
+	cfg := corecfg.NewCFG("test")
 	block := cfg.CreateBlock("middle")
 
 	// Connect entry to middle
-	edge1 := cfg.ConnectBlocks(cfg.Entry, block, EdgeNormal)
+	edge1 := cfg.ConnectBlocks(cfg.Entry, block, corecfg.EdgeNormal)
 	if edge1 == nil {
 		t.Error("ConnectBlocks should return edge")
 	}
@@ -286,25 +287,25 @@ func TestCFG_ConnectBlocks(t *testing.T) {
 	}
 
 	// Connect middle to exit
-	edge2 := cfg.ConnectBlocks(block, cfg.Exit, EdgeReturn)
-	if edge2.Type != EdgeReturn {
+	edge2 := cfg.ConnectBlocks(block, cfg.Exit, corecfg.EdgeReturn)
+	if edge2.Type != corecfg.EdgeReturn {
 		t.Errorf("Edge type should be EdgeReturn, got %s", edge2.Type)
 	}
 
 	// Connect with nil should return nil
-	edge3 := cfg.ConnectBlocks(nil, block, EdgeNormal)
+	edge3 := cfg.ConnectBlocks(nil, block, corecfg.EdgeNormal)
 	if edge3 != nil {
 		t.Error("ConnectBlocks with nil from should return nil")
 	}
 
-	edge4 := cfg.ConnectBlocks(block, nil, EdgeNormal)
+	edge4 := cfg.ConnectBlocks(block, nil, corecfg.EdgeNormal)
 	if edge4 != nil {
 		t.Error("ConnectBlocks with nil to should return nil")
 	}
 }
 
 func TestCFG_GetBlock(t *testing.T) {
-	cfg := NewCFG("test")
+	cfg := corecfg.NewCFG("test")
 	block := cfg.CreateBlock("test_block")
 
 	retrieved := cfg.GetBlock(block.ID)
@@ -319,7 +320,7 @@ func TestCFG_GetBlock(t *testing.T) {
 }
 
 func TestCFG_Size(t *testing.T) {
-	cfg := NewCFG("test")
+	cfg := corecfg.NewCFG("test")
 	if cfg.Size() != 2 {
 		t.Errorf("New CFG should have 2 blocks, got %d", cfg.Size())
 	}
@@ -337,7 +338,7 @@ func TestCFG_Size(t *testing.T) {
 }
 
 func TestCFG_String(t *testing.T) {
-	cfg := NewCFG("myFunction")
+	cfg := corecfg.NewCFG("myFunction")
 	result := cfg.String()
 	if result != "CFG(myFunction): 2 blocks" {
 		t.Errorf("CFG String() incorrect: %s", result)
@@ -352,24 +353,24 @@ type testVisitor struct {
 	stopAtEdge    bool
 }
 
-func (v *testVisitor) VisitBlock(block *BasicBlock) bool {
+func (v *testVisitor) VisitBlock(block *corecfg.BasicBlock) bool {
 	v.visitedBlocks = append(v.visitedBlocks, block.ID)
 	return block.ID != v.stopAtBlock
 }
 
-func (v *testVisitor) VisitEdge(edge *Edge) bool {
+func (v *testVisitor) VisitEdge(edge *corecfg.Edge) bool {
 	v.visitedEdges = append(v.visitedEdges, edge.From.ID+"->"+edge.To.ID)
 	return !v.stopAtEdge
 }
 
 func TestCFG_Walk(t *testing.T) {
-	cfg := NewCFG("test")
+	cfg := corecfg.NewCFG("test")
 	block1 := cfg.CreateBlock("block1")
 	block2 := cfg.CreateBlock("block2")
 
-	cfg.ConnectBlocks(cfg.Entry, block1, EdgeNormal)
-	cfg.ConnectBlocks(block1, block2, EdgeNormal)
-	cfg.ConnectBlocks(block2, cfg.Exit, EdgeNormal)
+	cfg.ConnectBlocks(cfg.Entry, block1, corecfg.EdgeNormal)
+	cfg.ConnectBlocks(block1, block2, corecfg.EdgeNormal)
+	cfg.ConnectBlocks(block2, cfg.Exit, corecfg.EdgeNormal)
 
 	visitor := &testVisitor{}
 	cfg.Walk(visitor)
@@ -383,13 +384,13 @@ func TestCFG_Walk(t *testing.T) {
 }
 
 func TestCFG_Walk_StopEarly(t *testing.T) {
-	cfg := NewCFG("test")
+	cfg := corecfg.NewCFG("test")
 	block1 := cfg.CreateBlock("block1")
 	block2 := cfg.CreateBlock("block2")
 
-	cfg.ConnectBlocks(cfg.Entry, block1, EdgeNormal)
-	cfg.ConnectBlocks(block1, block2, EdgeNormal)
-	cfg.ConnectBlocks(block2, cfg.Exit, EdgeNormal)
+	cfg.ConnectBlocks(cfg.Entry, block1, corecfg.EdgeNormal)
+	cfg.ConnectBlocks(block1, block2, corecfg.EdgeNormal)
+	cfg.ConnectBlocks(block2, cfg.Exit, corecfg.EdgeNormal)
 
 	visitor := &testVisitor{stopAtBlock: block1.ID}
 	cfg.Walk(visitor)
@@ -401,9 +402,9 @@ func TestCFG_Walk_StopEarly(t *testing.T) {
 }
 
 func TestCFG_Walk_NilEntry(t *testing.T) {
-	cfg := &CFG{
+	cfg := &corecfg.CFG{
 		Name:   "test",
-		Blocks: make(map[string]*BasicBlock),
+		Blocks: make(map[string]*corecfg.BasicBlock),
 		Entry:  nil,
 	}
 
@@ -416,14 +417,14 @@ func TestCFG_Walk_NilEntry(t *testing.T) {
 }
 
 func TestCFG_BreadthFirstWalk(t *testing.T) {
-	cfg := NewCFG("test")
+	cfg := corecfg.NewCFG("test")
 	block1 := cfg.CreateBlock("block1")
 	block2 := cfg.CreateBlock("block2")
 
-	cfg.ConnectBlocks(cfg.Entry, block1, EdgeCondTrue)
-	cfg.ConnectBlocks(cfg.Entry, block2, EdgeCondFalse)
-	cfg.ConnectBlocks(block1, cfg.Exit, EdgeNormal)
-	cfg.ConnectBlocks(block2, cfg.Exit, EdgeNormal)
+	cfg.ConnectBlocks(cfg.Entry, block1, corecfg.EdgeCondTrue)
+	cfg.ConnectBlocks(cfg.Entry, block2, corecfg.EdgeCondFalse)
+	cfg.ConnectBlocks(block1, cfg.Exit, corecfg.EdgeNormal)
+	cfg.ConnectBlocks(block2, cfg.Exit, corecfg.EdgeNormal)
 
 	visitor := &testVisitor{}
 	cfg.BreadthFirstWalk(visitor)
@@ -438,11 +439,11 @@ func TestCFG_BreadthFirstWalk(t *testing.T) {
 }
 
 func TestCFG_BreadthFirstWalk_StopEarly(t *testing.T) {
-	cfg := NewCFG("test")
+	cfg := corecfg.NewCFG("test")
 	block1 := cfg.CreateBlock("block1")
 
-	cfg.ConnectBlocks(cfg.Entry, block1, EdgeNormal)
-	cfg.ConnectBlocks(block1, cfg.Exit, EdgeNormal)
+	cfg.ConnectBlocks(cfg.Entry, block1, corecfg.EdgeNormal)
+	cfg.ConnectBlocks(block1, cfg.Exit, corecfg.EdgeNormal)
 
 	visitor := &testVisitor{stopAtBlock: cfg.Entry.ID}
 	cfg.BreadthFirstWalk(visitor)
@@ -454,11 +455,11 @@ func TestCFG_BreadthFirstWalk_StopEarly(t *testing.T) {
 }
 
 func TestCFG_BreadthFirstWalk_StopAtEdge(t *testing.T) {
-	cfg := NewCFG("test")
+	cfg := corecfg.NewCFG("test")
 	block1 := cfg.CreateBlock("block1")
 
-	cfg.ConnectBlocks(cfg.Entry, block1, EdgeNormal)
-	cfg.ConnectBlocks(block1, cfg.Exit, EdgeNormal)
+	cfg.ConnectBlocks(cfg.Entry, block1, corecfg.EdgeNormal)
+	cfg.ConnectBlocks(block1, cfg.Exit, corecfg.EdgeNormal)
 
 	visitor := &testVisitor{stopAtEdge: true}
 	cfg.BreadthFirstWalk(visitor)
@@ -470,9 +471,9 @@ func TestCFG_BreadthFirstWalk_StopAtEdge(t *testing.T) {
 }
 
 func TestCFG_BreadthFirstWalk_NilEntry(t *testing.T) {
-	cfg := &CFG{
+	cfg := &corecfg.CFG{
 		Name:   "test",
-		Blocks: make(map[string]*BasicBlock),
+		Blocks: make(map[string]*corecfg.BasicBlock),
 		Entry:  nil,
 	}
 
@@ -485,14 +486,14 @@ func TestCFG_BreadthFirstWalk_NilEntry(t *testing.T) {
 }
 
 func TestCFG_CyclicGraph(t *testing.T) {
-	cfg := NewCFG("test")
+	cfg := corecfg.NewCFG("test")
 	loopHeader := cfg.CreateBlock("loop_header")
 	loopBody := cfg.CreateBlock("loop_body")
 
-	cfg.ConnectBlocks(cfg.Entry, loopHeader, EdgeNormal)
-	cfg.ConnectBlocks(loopHeader, loopBody, EdgeCondTrue)
-	cfg.ConnectBlocks(loopHeader, cfg.Exit, EdgeCondFalse)
-	cfg.ConnectBlocks(loopBody, loopHeader, EdgeLoop) // Back edge
+	cfg.ConnectBlocks(cfg.Entry, loopHeader, corecfg.EdgeNormal)
+	cfg.ConnectBlocks(loopHeader, loopBody, corecfg.EdgeCondTrue)
+	cfg.ConnectBlocks(loopHeader, cfg.Exit, corecfg.EdgeCondFalse)
+	cfg.ConnectBlocks(loopBody, loopHeader, corecfg.EdgeLoop) // Back edge
 
 	visitor := &testVisitor{}
 	cfg.Walk(visitor)

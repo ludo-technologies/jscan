@@ -2,6 +2,8 @@ package analyzer
 
 import (
 	"testing"
+
+	corecfg "github.com/ludo-technologies/codescan-core/cfg"
 )
 
 func TestSeverityLevelConstants(t *testing.T) {
@@ -37,7 +39,7 @@ func TestDeadCodeReasonConstants(t *testing.T) {
 }
 
 func TestNewDeadCodeDetector(t *testing.T) {
-	cfg := NewCFG("test")
+	cfg := corecfg.NewCFG("test")
 	detector := NewDeadCodeDetector(cfg)
 
 	if detector == nil {
@@ -52,7 +54,7 @@ func TestNewDeadCodeDetector(t *testing.T) {
 }
 
 func TestNewDeadCodeDetectorWithFilePath(t *testing.T) {
-	cfg := NewCFG("test")
+	cfg := corecfg.NewCFG("test")
 	filePath := "/path/to/file.js"
 	detector := NewDeadCodeDetectorWithFilePath(cfg, filePath)
 
@@ -83,8 +85,8 @@ func TestDeadCodeDetector_Detect_NilCFG(t *testing.T) {
 }
 
 func TestDeadCodeDetector_Detect_SimpleCFG(t *testing.T) {
-	cfg := NewCFG("simpleFunc")
-	cfg.ConnectBlocks(cfg.Entry, cfg.Exit, EdgeNormal)
+	cfg := corecfg.NewCFG("simpleFunc")
+	cfg.ConnectBlocks(cfg.Entry, cfg.Exit, corecfg.EdgeNormal)
 
 	detector := NewDeadCodeDetector(cfg)
 	result := detector.Detect()
@@ -369,7 +371,7 @@ func TestDeadCodeDetector_getCodeSnippet_Empty(t *testing.T) {
 
 func TestDeadCodeDetector_getFunctionName(t *testing.T) {
 	// With CFG
-	cfg := NewCFG("myFunction")
+	cfg := corecfg.NewCFG("myFunction")
 	detector := NewDeadCodeDetector(cfg)
 	name := detector.getFunctionName()
 
@@ -387,7 +389,7 @@ func TestDeadCodeDetector_getFunctionName(t *testing.T) {
 }
 
 func TestDeadCodeDetector_getFilePath(t *testing.T) {
-	detector := NewDeadCodeDetectorWithFilePath(NewCFG("test"), "/path/to/file.js")
+	detector := NewDeadCodeDetectorWithFilePath(corecfg.NewCFG("test"), "/path/to/file.js")
 	path := detector.getFilePath()
 
 	if path != "/path/to/file.js" {
@@ -396,8 +398,8 @@ func TestDeadCodeDetector_getFilePath(t *testing.T) {
 }
 
 func TestDeadCodeDetector_Detect_AnalysisTime(t *testing.T) {
-	cfg := NewCFG("test")
-	cfg.ConnectBlocks(cfg.Entry, cfg.Exit, EdgeNormal)
+	cfg := corecfg.NewCFG("test")
+	cfg.ConnectBlocks(cfg.Entry, cfg.Exit, corecfg.EdgeNormal)
 
 	detector := NewDeadCodeDetector(cfg)
 	result := detector.Detect()
@@ -438,8 +440,8 @@ func TestDeadCodeDetector_Detect_SortsByLineNumber(t *testing.T) {
 }
 
 func TestDeadCodeDetector_Detect_WithFilePath(t *testing.T) {
-	cfg := NewCFG("test")
-	cfg.ConnectBlocks(cfg.Entry, cfg.Exit, EdgeNormal)
+	cfg := corecfg.NewCFG("test")
+	cfg.ConnectBlocks(cfg.Entry, cfg.Exit, corecfg.EdgeNormal)
 
 	filePath := "/src/components/Button.js"
 	detector := NewDeadCodeDetectorWithFilePath(cfg, filePath)

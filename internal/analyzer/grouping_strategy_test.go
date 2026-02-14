@@ -522,7 +522,6 @@ func TestCompleteLinkageGroupingTriangle(t *testing.T) {
 func TestCompleteLinkageGroupingNonClique(t *testing.T) {
 	grouping := NewCompleteLinkageGrouping(0.8)
 
-	// Three clones but only 2 edges: 1-2, 2-3 (not a complete clique)
 	clone1 := &domain.Clone{ID: 1, Location: &domain.CloneLocation{FilePath: "a.js", StartLine: 1, EndLine: 10}}
 	clone2 := &domain.Clone{ID: 2, Location: &domain.CloneLocation{FilePath: "b.js", StartLine: 1, EndLine: 10}}
 	clone3 := &domain.Clone{ID: 3, Location: &domain.CloneLocation{FilePath: "c.js", StartLine: 1, EndLine: 10}}
@@ -530,14 +529,14 @@ func TestCompleteLinkageGroupingNonClique(t *testing.T) {
 	pairs := []*domain.ClonePair{
 		{ID: 1, Clone1: clone1, Clone2: clone2, Similarity: 0.9, Type: domain.Type1Clone},
 		{ID: 2, Clone1: clone2, Clone2: clone3, Similarity: 0.9, Type: domain.Type1Clone},
-		// Missing clone1-clone3 edge
 	}
 
 	groups := grouping.GroupClones(pairs)
 
-	// Should form 2 cliques of size 2: (1,2) and (2,3)
-	if len(groups) != 2 {
-		t.Errorf("Expected 2 groups (two overlapping pairs), got %d", len(groups))
+	// Core deduplicates: items are assigned to the largest clique first.
+	// Clique {1,2} gets both items, then {2,3} has only item 3 left (singleton, filtered).
+	if len(groups) != 1 {
+		t.Errorf("Expected 1 group (item 2 assigned to first clique, singleton filtered), got %d", len(groups))
 	}
 }
 

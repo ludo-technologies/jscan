@@ -76,6 +76,19 @@ func (c *Clone) String() string {
 		c.ID, c.Type.String(), c.Location.String(), c.Size)
 }
 
+// ItemID implements clone.GroupableItem for codescan-core grouping.
+func (c *Clone) ItemID() int { return c.ID }
+
+// ItemKey implements clone.GroupableItem for codescan-core grouping.
+func (c *Clone) ItemKey() string {
+	if c == nil || c.Location == nil {
+		return fmt.Sprintf("%d", c.ID)
+	}
+	return fmt.Sprintf("%s|%d|%d|%d|%d",
+		c.Location.FilePath, c.Location.StartLine, c.Location.EndLine,
+		c.Location.StartCol, c.Location.EndCol)
+}
+
 // ClonePair represents a pair of similar code clones
 type ClonePair struct {
 	ID         int       `json:"id" yaml:"id" csv:"id"`

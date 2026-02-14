@@ -5,6 +5,7 @@ import (
 	"os"
 	"testing"
 
+	corecfg "github.com/ludo-technologies/codescan-core/cfg"
 	"github.com/ludo-technologies/jscan/internal/parser"
 )
 
@@ -151,11 +152,11 @@ func TestCFGBuilder_Build_IfStatement(t *testing.T) {
 	hasCondTrue := false
 	hasCondFalse := false
 	cfg.Walk(&edgeTypeChecker{
-		onEdge: func(e *Edge) {
-			if e.Type == EdgeCondTrue {
+		onEdge: func(e *corecfg.Edge) {
+			if e.Type == corecfg.EdgeCondTrue {
 				hasCondTrue = true
 			}
-			if e.Type == EdgeCondFalse {
+			if e.Type == corecfg.EdgeCondFalse {
 				hasCondFalse = true
 			}
 		},
@@ -192,11 +193,11 @@ func TestCFGBuilder_Build_IfWithoutElse(t *testing.T) {
 	hasCondTrue := false
 	hasCondFalse := false
 	cfg.Walk(&edgeTypeChecker{
-		onEdge: func(e *Edge) {
-			if e.Type == EdgeCondTrue {
+		onEdge: func(e *corecfg.Edge) {
+			if e.Type == corecfg.EdgeCondTrue {
 				hasCondTrue = true
 			}
-			if e.Type == EdgeCondFalse {
+			if e.Type == corecfg.EdgeCondFalse {
 				hasCondFalse = true
 			}
 		},
@@ -231,8 +232,8 @@ func TestCFGBuilder_Build_NestedIf(t *testing.T) {
 	// Count conditional edges
 	condEdges := 0
 	cfg.Walk(&edgeTypeChecker{
-		onEdge: func(e *Edge) {
-			if e.Type == EdgeCondTrue || e.Type == EdgeCondFalse {
+		onEdge: func(e *corecfg.Edge) {
+			if e.Type == corecfg.EdgeCondTrue || e.Type == corecfg.EdgeCondFalse {
 				condEdges++
 			}
 		},
@@ -264,8 +265,8 @@ func TestCFGBuilder_Build_ForLoop(t *testing.T) {
 	// Should have back edge (loop)
 	hasLoopEdge := false
 	cfg.Walk(&edgeTypeChecker{
-		onEdge: func(e *Edge) {
-			if e.Type == EdgeLoop {
+		onEdge: func(e *corecfg.Edge) {
+			if e.Type == corecfg.EdgeLoop {
 				hasLoopEdge = true
 			}
 		},
@@ -296,8 +297,8 @@ func TestCFGBuilder_Build_ForInLoop(t *testing.T) {
 
 	hasLoopEdge := false
 	cfg.Walk(&edgeTypeChecker{
-		onEdge: func(e *Edge) {
-			if e.Type == EdgeLoop {
+		onEdge: func(e *corecfg.Edge) {
+			if e.Type == corecfg.EdgeLoop {
 				hasLoopEdge = true
 			}
 		},
@@ -328,8 +329,8 @@ func TestCFGBuilder_Build_ForOfLoop(t *testing.T) {
 
 	hasLoopEdge := false
 	cfg.Walk(&edgeTypeChecker{
-		onEdge: func(e *Edge) {
-			if e.Type == EdgeLoop {
+		onEdge: func(e *corecfg.Edge) {
+			if e.Type == corecfg.EdgeLoop {
 				hasLoopEdge = true
 			}
 		},
@@ -363,11 +364,11 @@ func TestCFGBuilder_Build_WhileLoop(t *testing.T) {
 	hasLoopEdge := false
 	hasCondEdges := 0
 	cfg.Walk(&edgeTypeChecker{
-		onEdge: func(e *Edge) {
-			if e.Type == EdgeLoop {
+		onEdge: func(e *corecfg.Edge) {
+			if e.Type == corecfg.EdgeLoop {
 				hasLoopEdge = true
 			}
-			if e.Type == EdgeCondTrue || e.Type == EdgeCondFalse {
+			if e.Type == corecfg.EdgeCondTrue || e.Type == corecfg.EdgeCondFalse {
 				hasCondEdges++
 			}
 		},
@@ -404,8 +405,8 @@ func TestCFGBuilder_Build_DoWhileLoop(t *testing.T) {
 	// Do-while has back edge from condition to body
 	hasCondTrue := false
 	cfg.Walk(&edgeTypeChecker{
-		onEdge: func(e *Edge) {
-			if e.Type == EdgeCondTrue {
+		onEdge: func(e *corecfg.Edge) {
+			if e.Type == corecfg.EdgeCondTrue {
 				hasCondTrue = true
 			}
 		},
@@ -478,8 +479,8 @@ func TestCFGBuilder_Build_SwitchWithFallthrough(t *testing.T) {
 	// Verify there are conditional edges for case matching
 	condEdges := 0
 	cfg.Walk(&edgeTypeChecker{
-		onEdge: func(e *Edge) {
-			if e.Type == EdgeCondTrue || e.Type == EdgeCondFalse {
+		onEdge: func(e *corecfg.Edge) {
+			if e.Type == corecfg.EdgeCondTrue || e.Type == corecfg.EdgeCondFalse {
 				condEdges++
 			}
 		},
@@ -515,8 +516,8 @@ func TestCFGBuilder_Build_TryCatchFinally(t *testing.T) {
 	// Should have exception edge
 	hasExceptionEdge := false
 	cfg.Walk(&edgeTypeChecker{
-		onEdge: func(e *Edge) {
-			if e.Type == EdgeException {
+		onEdge: func(e *corecfg.Edge) {
+			if e.Type == corecfg.EdgeException {
 				hasExceptionEdge = true
 			}
 		},
@@ -549,8 +550,8 @@ func TestCFGBuilder_Build_TryCatch(t *testing.T) {
 
 	hasExceptionEdge := false
 	cfg.Walk(&edgeTypeChecker{
-		onEdge: func(e *Edge) {
-			if e.Type == EdgeException {
+		onEdge: func(e *corecfg.Edge) {
+			if e.Type == corecfg.EdgeException {
 				hasExceptionEdge = true
 			}
 		},
@@ -584,8 +585,8 @@ func TestCFGBuilder_Build_ReturnStatement(t *testing.T) {
 	// Count return edges
 	returnEdges := 0
 	cfg.Walk(&edgeTypeChecker{
-		onEdge: func(e *Edge) {
-			if e.Type == EdgeReturn {
+		onEdge: func(e *corecfg.Edge) {
+			if e.Type == corecfg.EdgeReturn {
 				returnEdges++
 			}
 		},
@@ -618,8 +619,8 @@ func TestCFGBuilder_Build_BreakStatement(t *testing.T) {
 
 	hasBreakEdge := false
 	cfg.Walk(&edgeTypeChecker{
-		onEdge: func(e *Edge) {
-			if e.Type == EdgeBreak {
+		onEdge: func(e *corecfg.Edge) {
+			if e.Type == corecfg.EdgeBreak {
 				hasBreakEdge = true
 			}
 		},
@@ -653,8 +654,8 @@ func TestCFGBuilder_Build_ContinueStatement(t *testing.T) {
 
 	hasContinueEdge := false
 	cfg.Walk(&edgeTypeChecker{
-		onEdge: func(e *Edge) {
-			if e.Type == EdgeContinue {
+		onEdge: func(e *corecfg.Edge) {
+			if e.Type == corecfg.EdgeContinue {
 				hasContinueEdge = true
 			}
 		},
@@ -686,8 +687,8 @@ func TestCFGBuilder_Build_ThrowStatement(t *testing.T) {
 
 	hasExceptionEdge := false
 	cfg.Walk(&edgeTypeChecker{
-		onEdge: func(e *Edge) {
-			if e.Type == EdgeException {
+		onEdge: func(e *corecfg.Edge) {
+			if e.Type == corecfg.EdgeException {
 				hasExceptionEdge = true
 			}
 		},
@@ -721,8 +722,8 @@ func TestCFGBuilder_Build_NestedLoops(t *testing.T) {
 	// Count loop edges
 	loopEdges := 0
 	cfg.Walk(&edgeTypeChecker{
-		onEdge: func(e *Edge) {
-			if e.Type == EdgeLoop {
+		onEdge: func(e *corecfg.Edge) {
+			if e.Type == corecfg.EdgeLoop {
 				loopEdges++
 			}
 		},
@@ -948,14 +949,14 @@ func TestCFGBuilder_Build_ComplexControlFlow(t *testing.T) {
 	}
 
 	// Verify various edge types exist
-	edgeTypes := make(map[EdgeType]bool)
+	edgeTypes := make(map[corecfg.EdgeType]bool)
 	cfg.Walk(&edgeTypeChecker{
-		onEdge: func(e *Edge) {
+		onEdge: func(e *corecfg.Edge) {
 			edgeTypes[e.Type] = true
 		},
 	})
 
-	requiredEdges := []EdgeType{EdgeCondTrue, EdgeCondFalse, EdgeLoop, EdgeBreak, EdgeContinue, EdgeException, EdgeReturn}
+	requiredEdges := []corecfg.EdgeType{corecfg.EdgeCondTrue, corecfg.EdgeCondFalse, corecfg.EdgeLoop, corecfg.EdgeBreak, corecfg.EdgeContinue, corecfg.EdgeException, corecfg.EdgeReturn}
 	for _, et := range requiredEdges {
 		if !edgeTypes[et] {
 			t.Errorf("Complex CFG should have %s edge", et)
@@ -1217,14 +1218,14 @@ func TestCFGBuilder_BuildAll_Mixed(t *testing.T) {
 
 // Helper visitor for checking edge types
 type edgeTypeChecker struct {
-	onEdge func(*Edge)
+	onEdge func(*corecfg.Edge)
 }
 
-func (v *edgeTypeChecker) VisitBlock(block *BasicBlock) bool {
+func (v *edgeTypeChecker) VisitBlock(block *corecfg.BasicBlock) bool {
 	return true
 }
 
-func (v *edgeTypeChecker) VisitEdge(edge *Edge) bool {
+func (v *edgeTypeChecker) VisitEdge(edge *corecfg.Edge) bool {
 	if v.onEdge != nil {
 		v.onEdge(edge)
 	}
