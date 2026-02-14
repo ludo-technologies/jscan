@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-02-14
+
+### Changed
+
+- Unify JSON output keys to snake_case and rename `detect_after_raise` to `detect_after_throw`
+
+### Fixed
+
+- Apply config `max_complexity` when CLI flag is not explicitly set
+- Stop auto-discovering extensionless `.jscanrc`
+- Wire config loading and harden CI workflows
+
 ## [0.2.2] - 2026-02-12
 
 ### Changed
@@ -82,7 +94,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - CLI with analyze command
 - Configuration file support (jscan.config.json)
 
-[Unreleased]: https://github.com/ludo-technologies/jscan/compare/v0.2.2...HEAD
+[Unreleased]: https://github.com/ludo-technologies/jscan/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/ludo-technologies/jscan/compare/v0.2.2...v0.3.0
 [0.2.2]: https://github.com/ludo-technologies/jscan/compare/v0.2.1...v0.2.2
 [0.2.1]: https://github.com/ludo-technologies/jscan/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/ludo-technologies/jscan/compare/v0.1.1...v0.2.0
