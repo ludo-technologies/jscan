@@ -1,12 +1,12 @@
 {
   "complexity": {
-    "lowThreshold": 9,
-    "mediumThreshold": 19,
-    "maxComplexity": 0,
+    "low_threshold": 9,
+    "medium_threshold": 19,
+    "max_complexity": 0,
     "enabled": true,
-    "reportUnchanged": true
+    "report_unchanged": true
   },
-  "deadCode": {
+  "dead_code": {
     "enabled": true,
     "min_severity": "warning",
     "show_context": false,
@@ -15,7 +15,7 @@
     "detect_after_return": true,
     "detect_after_break": true,
     "detect_after_continue": true,
-    "detect_after_raise": true,
+    "detect_after_throw": true,
     "detect_unreachable_branches": true,
     "ignore_patterns": []
   },

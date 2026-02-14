@@ -49,7 +49,7 @@ type PyscnConfig struct {
 	DeadCodeDetectAfterReturn         *bool    `mapstructure:"dead_code_detect_after_return" yaml:"dead_code_detect_after_return" json:"dead_code_detect_after_return"`
 	DeadCodeDetectAfterBreak          *bool    `mapstructure:"dead_code_detect_after_break" yaml:"dead_code_detect_after_break" json:"dead_code_detect_after_break"`
 	DeadCodeDetectAfterContinue       *bool    `mapstructure:"dead_code_detect_after_continue" yaml:"dead_code_detect_after_continue" json:"dead_code_detect_after_continue"`
-	DeadCodeDetectAfterRaise          *bool    `mapstructure:"dead_code_detect_after_raise" yaml:"dead_code_detect_after_raise" json:"dead_code_detect_after_raise"`
+	DeadCodeDetectAfterThrow          *bool    `mapstructure:"dead_code_detect_after_throw" yaml:"dead_code_detect_after_throw" json:"dead_code_detect_after_throw"`
 	DeadCodeDetectUnreachableBranches *bool    `mapstructure:"dead_code_detect_unreachable_branches" yaml:"dead_code_detect_unreachable_branches" json:"dead_code_detect_unreachable_branches"`
 	DeadCodeIgnorePatterns            []string `mapstructure:"dead_code_ignore_patterns" yaml:"dead_code_ignore_patterns" json:"dead_code_ignore_patterns"`
 
@@ -326,7 +326,7 @@ func DefaultPyscnConfig() *PyscnConfig {
 		DeadCodeDetectAfterReturn:         BoolPtr(true),
 		DeadCodeDetectAfterBreak:          BoolPtr(true),
 		DeadCodeDetectAfterContinue:       BoolPtr(true),
-		DeadCodeDetectAfterRaise:          BoolPtr(true),
+		DeadCodeDetectAfterThrow:          BoolPtr(true),
 		DeadCodeDetectUnreachableBranches: BoolPtr(true),
 		DeadCodeIgnorePatterns:            []string{},
 

@@ -158,7 +158,7 @@ func GetFullConfigTemplate(projectType ProjectType, strictness Strictness) strin
     "detect_after_return": true,
     "detect_after_break": true,
     "detect_after_continue": true,
-    "detect_after_raise": true,
+    "detect_after_throw": true,
     "detect_unreachable_branches": true,
     "ignore_patterns": []
   },

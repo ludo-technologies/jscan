@@ -45,13 +45,13 @@ type Config struct {
 	Complexity ComplexityConfig `json:"complexity" mapstructure:"complexity" yaml:"complexity"`
 
 	// DeadCode holds dead code detection configuration
-	DeadCode DeadCodeConfig `json:"deadCode" mapstructure:"dead_code" yaml:"dead_code"`
+	DeadCode DeadCodeConfig `json:"dead_code" mapstructure:"dead_code" yaml:"dead_code"`
 
 	// Clones holds the unified clone detection configuration
 	Clones *PyscnConfig `json:"clones,omitempty" mapstructure:"clones" yaml:"clones"`
 
 	// SystemAnalysis holds system-level analysis configuration
-	SystemAnalysis SystemAnalysisConfig `json:"systemAnalysis,omitempty" mapstructure:"system_analysis" yaml:"system_analysis"`
+	SystemAnalysis SystemAnalysisConfig `json:"system_analysis,omitempty" mapstructure:"system_analysis" yaml:"system_analysis"`
 
 	// Dependencies holds dependency analysis configuration
 	Dependencies DependencyAnalysisConfig `json:"dependencies,omitempty" mapstructure:"dependencies" yaml:"dependencies"`
@@ -60,7 +60,7 @@ type Config struct {
 	Architecture ArchitectureConfig `json:"architecture,omitempty" mapstructure:"architecture" yaml:"architecture"`
 
 	// ModuleAnalysis holds module analysis configuration
-	ModuleAnalysis ModuleAnalysisConfig `json:"moduleAnalysis,omitempty" mapstructure:"module_analysis" yaml:"module_analysis"`
+	ModuleAnalysis ModuleAnalysisConfig `json:"module_analysis,omitempty" mapstructure:"module_analysis" yaml:"module_analysis"`
 
 	// Output holds output formatting configuration
 	Output OutputConfig `json:"output" mapstructure:"output" yaml:"output"`
@@ -72,21 +72,21 @@ type Config struct {
 // ComplexityConfig holds configuration for cyclomatic complexity analysis
 type ComplexityConfig struct {
 	// LowThreshold is the upper bound for low complexity (inclusive)
-	LowThreshold int `json:"lowThreshold" mapstructure:"low_threshold" yaml:"low_threshold"`
+	LowThreshold int `json:"low_threshold" mapstructure:"low_threshold" yaml:"low_threshold"`
 
 	// MediumThreshold is the upper bound for medium complexity (inclusive)
 	// Values above this are considered high complexity
-	MediumThreshold int `json:"mediumThreshold" mapstructure:"medium_threshold" yaml:"medium_threshold"`
+	MediumThreshold int `json:"medium_threshold" mapstructure:"medium_threshold" yaml:"medium_threshold"`
 
 	// Enabled controls whether complexity analysis is performed
 	Enabled bool `json:"enabled" mapstructure:"enabled" yaml:"enabled"`
 
 	// ReportUnchanged controls whether to report functions with complexity = 1
-	ReportUnchanged bool `json:"reportUnchanged" mapstructure:"report_unchanged" yaml:"report_unchanged"`
+	ReportUnchanged bool `json:"report_unchanged" mapstructure:"report_unchanged" yaml:"report_unchanged"`
 
 	// MaxComplexity is the maximum allowed complexity before failing analysis
 	// 0 means no limit
-	MaxComplexity int `json:"maxComplexity" mapstructure:"max_complexity" yaml:"max_complexity"`
+	MaxComplexity int `json:"max_complexity" mapstructure:"max_complexity" yaml:"max_complexity"`
 }
 
 // OutputConfig holds configuration for output formatting
@@ -128,7 +128,7 @@ type DeadCodeConfig struct {
 	DetectAfterReturn         bool `json:"detect_after_return" mapstructure:"detect_after_return" yaml:"detect_after_return"`
 	DetectAfterBreak          bool `json:"detect_after_break" mapstructure:"detect_after_break" yaml:"detect_after_break"`
 	DetectAfterContinue       bool `json:"detect_after_continue" mapstructure:"detect_after_continue" yaml:"detect_after_continue"`
-	DetectAfterRaise          bool `json:"detect_after_raise" mapstructure:"detect_after_raise" yaml:"detect_after_raise"`
+	DetectAfterThrow          bool `json:"detect_after_throw" mapstructure:"detect_after_throw" yaml:"detect_after_throw"`
 	DetectUnreachableBranches bool `json:"detect_unreachable_branches" mapstructure:"detect_unreachable_branches" yaml:"detect_unreachable_branches"`
 
 	// IgnorePatterns specifies patterns for code to ignore (e.g., comments, debug code)
@@ -169,7 +169,7 @@ func DefaultConfig() *Config {
 			DetectAfterReturn:         true,
 			DetectAfterBreak:          true,
 			DetectAfterContinue:       true,
-			DetectAfterRaise:          true,
+			DetectAfterThrow:          true,
 			DetectUnreachableBranches: true,
 			IgnorePatterns:            []string{},
 		},
@@ -640,7 +640,7 @@ func (c *DeadCodeConfig) HasAnyDetectionEnabled() bool {
 	return c.DetectAfterReturn ||
 		c.DetectAfterBreak ||
 		c.DetectAfterContinue ||
-		c.DetectAfterRaise ||
+		c.DetectAfterThrow ||
 		c.DetectUnreachableBranches
 }
 
