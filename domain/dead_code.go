@@ -54,7 +54,7 @@ type DeadCodeRequest struct {
 	DetectAfterReturn         *bool // nil = use default (true), non-nil = explicitly set
 	DetectAfterBreak          *bool // nil = use default (true), non-nil = explicitly set
 	DetectAfterContinue       *bool // nil = use default (true), non-nil = explicitly set
-	DetectAfterRaise          *bool // nil = use default (true), non-nil = explicitly set
+	DetectAfterThrow          *bool // nil = use default (true), non-nil = explicitly set
 	DetectUnreachableBranches *bool // nil = use default (true), non-nil = explicitly set
 }
 
@@ -235,7 +235,7 @@ func DefaultDeadCodeRequest() *DeadCodeRequest {
 		DetectAfterReturn:         BoolPtr(true),
 		DetectAfterBreak:          BoolPtr(true),
 		DetectAfterContinue:       BoolPtr(true),
-		DetectAfterRaise:          BoolPtr(true),
+		DetectAfterThrow:          BoolPtr(true),
 		DetectUnreachableBranches: BoolPtr(true),
 	}
 }

@@ -83,12 +83,12 @@ func runAnalyze(cmd *cobra.Command, args []string) error {
 	}
 
 	// Load configuration
-	cfg := config.DefaultConfig()
-	if configPath != "" {
-		// TODO: Load custom config
-		if format != domain.OutputFormatJSON {
-			fmt.Printf("Using config: %s\n", configPath)
-		}
+	cfg, err := config.LoadConfigWithTarget(configPath, args[0])
+	if err != nil {
+		return fmt.Errorf("failed to load configuration: %w", err)
+	}
+	if configPath != "" && format != domain.OutputFormatJSON {
+		fmt.Printf("Using config: %s\n", configPath)
 	}
 
 	// Collect JavaScript/TypeScript files (using exclude patterns from config)

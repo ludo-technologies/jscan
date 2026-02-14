@@ -16,6 +16,7 @@ import (
 var (
 	depsOutputFormat    string
 	depsOutputPath      string
+	depsConfigPath      string
 	depsDotFormat       bool
 	depsIncludeExternal bool
 	depsIncludeTypes    bool
@@ -60,6 +61,8 @@ Examples:
 		"Output format: text, json, dot")
 	cmd.Flags().StringVarP(&depsOutputPath, "output", "o", "",
 		"Output file path (default: stdout)")
+	cmd.Flags().StringVarP(&depsConfigPath, "config", "c", "",
+		"Path to config file")
 	cmd.Flags().BoolVar(&depsDotFormat, "dot", false,
 		"Shorthand for --format dot")
 	cmd.Flags().BoolVar(&depsIncludeExternal, "include-external", false,
@@ -95,8 +98,11 @@ func runDeps(cmd *cobra.Command, args []string) (err error) {
 		format = domain.OutputFormatText
 	}
 
-	// Load default configuration
-	cfg := config.DefaultConfig()
+	// Load configuration
+	cfg, err := config.LoadConfigWithTarget(depsConfigPath, args[0])
+	if err != nil {
+		return fmt.Errorf("failed to load configuration: %w", err)
+	}
 
 	// Collect JavaScript/TypeScript files (using exclude patterns from config)
 	var files []string

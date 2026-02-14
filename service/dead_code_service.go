@@ -382,7 +382,7 @@ func (s *DeadCodeServiceImpl) buildConfigForResponse(req domain.DeadCodeRequest)
 		"detect_return":   domain.BoolValue(req.DetectAfterReturn, true),
 		"detect_break":    domain.BoolValue(req.DetectAfterBreak, true),
 		"detect_continue": domain.BoolValue(req.DetectAfterContinue, true),
-		"detect_raise":    domain.BoolValue(req.DetectAfterRaise, true),
+		"detect_throw":    domain.BoolValue(req.DetectAfterThrow, true),
 	}
 }
 

@@ -45,8 +45,8 @@ func TestConfigurationLoader_LoadConfig_Valid(t *testing.T) {
 	configFile := filepath.Join(tempDir, "config.json")
 	content := `{
 		"complexity": {
-			"lowThreshold": 5,
-			"mediumThreshold": 10
+			"low_threshold": 5,
+			"medium_threshold": 10
 		},
 		"output": {
 			"format": "json",

@@ -1,7 +1,6 @@
 package service
 
 import (
-	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -20,33 +19,23 @@ func NewConfigurationLoader() *ConfigurationLoaderImpl {
 
 // LoadConfig loads configuration from the specified path
 func (c *ConfigurationLoaderImpl) LoadConfig(path string) (*domain.ComplexityRequest, error) {
-	// Read JSON config file
-	data, err := os.ReadFile(path)
+	cfg, err := config.LoadConfig(path)
 	if err != nil {
-		return nil, domain.NewConfigError("failed to read configuration file", err)
+		return nil, domain.NewConfigError("failed to load configuration file", err)
 	}
 
-	var cfg config.Config
-	if err := json.Unmarshal(data, &cfg); err != nil {
-		return nil, domain.NewConfigError("failed to parse configuration file", err)
-	}
-
-	return c.convertToComplexityRequest(&cfg), nil
+	return c.convertToComplexityRequest(cfg), nil
 }
 
 // LoadDefaultConfig loads the default configuration, first checking for jscan.config.json
 func (c *ConfigurationLoaderImpl) LoadDefaultConfig() *domain.ComplexityRequest {
-	// First, try to find and load a config file in the current directory
-	configFile := c.FindDefaultConfigFile()
-	if configFile != "" {
-		if configReq, err := c.LoadConfig(configFile); err == nil {
-			return configReq
-		}
-		// If loading failed, fall back to hardcoded defaults
+	cfg, err := config.LoadConfigWithTarget("", "")
+	if err == nil {
+		return c.convertToComplexityRequest(cfg)
 	}
 
 	// Fall back to hardcoded default configuration
-	cfg := config.DefaultConfig()
+	cfg = config.DefaultConfig()
 	return c.convertToComplexityRequest(cfg)
 }
 
@@ -56,7 +45,12 @@ func (c *ConfigurationLoaderImpl) FindDefaultConfigFile() string {
 	configFiles := []string{
 		"jscan.config.json",
 		".jscanrc.json",
-		".jscanrc",
+		"jscan.yaml",
+		"jscan.yml",
+		".jscan.toml",
+		".jscan.yml",
+		"jscan.json",
+		".jscan.json",
 	}
 
 	// Check current directory

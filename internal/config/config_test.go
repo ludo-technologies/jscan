@@ -333,14 +333,14 @@ func TestSearchConfigInDirectory(t *testing.T) {
 	defer os.RemoveAll(tempDir)
 
 	// Create a config file
-	configPath := filepath.Join(tempDir, "pyscn.yaml")
+	configPath := filepath.Join(tempDir, "jscan.yaml")
 	err = os.WriteFile(configPath, []byte("complexity:\n  low_threshold: 5"), 0644)
 	if err != nil {
 		t.Fatalf("Failed to write config file: %v", err)
 	}
 
 	// Search for config
-	candidates := []string{"pyscn.yaml", "pyscn.yml"}
+	candidates := []string{"jscan.yaml", "jscan.yml"}
 	result := searchConfigInDirectory(tempDir, candidates)
 
 	if result != configPath {

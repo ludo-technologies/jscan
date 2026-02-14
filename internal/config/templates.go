@@ -45,11 +45,11 @@ func GetProjectPresets() map[ProjectType]ProjectPreset {
 				"**/*.tsx",
 			},
 			ExcludePatterns: []string{
-				"**/node_modules/**",
-				"**/dist/**",
-				"**/build/**",
-				"**/*.min.js",
-				"**/*.bundle.js",
+				"node_modules",
+				"dist",
+				"build",
+				"*.min.js",
+				"*.bundle.js",
 			},
 		},
 		ProjectTypeReact: {
@@ -60,13 +60,13 @@ func GetProjectPresets() map[ProjectType]ProjectPreset {
 				"**/*.tsx",
 			},
 			ExcludePatterns: []string{
-				"**/node_modules/**",
-				"**/dist/**",
-				"**/build/**",
-				"**/.next/**",
-				"**/coverage/**",
-				"**/*.min.js",
-				"**/*.bundle.js",
+				"node_modules",
+				"dist",
+				"build",
+				".next",
+				"coverage",
+				"*.min.js",
+				"*.bundle.js",
 			},
 		},
 		ProjectTypeVue: {
@@ -78,13 +78,13 @@ func GetProjectPresets() map[ProjectType]ProjectPreset {
 				"**/*.vue",
 			},
 			ExcludePatterns: []string{
-				"**/node_modules/**",
-				"**/dist/**",
-				"**/build/**",
-				"**/.nuxt/**",
-				"**/coverage/**",
-				"**/*.min.js",
-				"**/*.bundle.js",
+				"node_modules",
+				"dist",
+				"build",
+				".nuxt",
+				"coverage",
+				"*.min.js",
+				"*.bundle.js",
 			},
 		},
 		ProjectTypeNodeBackend: {
@@ -95,14 +95,14 @@ func GetProjectPresets() map[ProjectType]ProjectPreset {
 				"**/*.cjs",
 			},
 			ExcludePatterns: []string{
-				"**/node_modules/**",
-				"**/dist/**",
-				"**/build/**",
-				"**/test/**",
-				"**/tests/**",
-				"**/__tests__/**",
-				"**/*.min.js",
-				"**/*.bundle.js",
+				"node_modules",
+				"dist",
+				"build",
+				"test",
+				"tests",
+				"__tests__",
+				"*.min.js",
+				"*.bundle.js",
 			},
 		},
 	}
@@ -129,7 +129,7 @@ func GetStrictnessPresets() map[Strictness]StrictnessPreset {
 	}
 }
 
-// GetFullConfigTemplate returns the documented config template as JSONC
+// GetFullConfigTemplate returns a full config template as valid JSON.
 func GetFullConfigTemplate(projectType ProjectType, strictness Strictness) string {
 	projectPresets := GetProjectPresets()
 	strictnessPresets := GetStrictnessPresets()
@@ -142,108 +142,57 @@ func GetFullConfigTemplate(projectType ProjectType, strictness Strictness) strin
 	excludePatterns := formatJSONArray(preset.ExcludePatterns)
 
 	return `{
-  // jscan Configuration
-  // Documentation: https://github.com/ludo-technologies/jscan
-
-  // ============================================================================
-  // COMPLEXITY ANALYSIS
-  // ============================================================================
-  // Analyzes cyclomatic complexity of functions to identify hard-to-maintain code
   "complexity": {
-    // Enable/disable complexity analysis
     "enabled": true,
-
-    // Threshold for LOW risk (recommended: 10)
-    // Functions with complexity <= this value are considered easy to maintain
-    "lowThreshold": ` + strconv.Itoa(strict.LowThreshold) + `,
-
-    // Threshold for MEDIUM risk
-    // Functions above lowThreshold but <= this value need attention
-    // Functions above this are considered HIGH risk
-    "mediumThreshold": ` + strconv.Itoa(strict.MediumThreshold) + `,
-
-    // Maximum allowed complexity (0 = no limit)
-    // Set this for CI/CD enforcement to fail builds on complex functions
-    "maxComplexity": ` + strconv.Itoa(strict.MaxComplexity) + `,
-
-    // Report functions with complexity = 1 (simple functions)
-    "reportUnchanged": false
+    "low_threshold": ` + strconv.Itoa(strict.LowThreshold) + `,
+    "medium_threshold": ` + strconv.Itoa(strict.MediumThreshold) + `,
+    "max_complexity": ` + strconv.Itoa(strict.MaxComplexity) + `,
+    "report_unchanged": false
   },
-
-  // ============================================================================
-  // DEAD CODE DETECTION
-  // ============================================================================
-  // Detects unreachable code that will never execute
-  "deadCode": {
-    // Enable/disable dead code detection
+  "dead_code": {
     "enabled": true,
-
-    // Minimum severity level to report: "info", "warning", "critical"
-    "minSeverity": "warning",
-
-    // Detection options - enable/disable specific dead code patterns
-    "detectAfterReturn": true,
-    "detectAfterBreak": true,
-    "detectAfterContinue": true,
-    "detectAfterThrow": true,
-    "detectUnreachableBranches": true
+    "min_severity": "warning",
+    "show_context": false,
+    "context_lines": 3,
+    "sort_by": "severity",
+    "detect_after_return": true,
+    "detect_after_break": true,
+    "detect_after_continue": true,
+    "detect_after_throw": true,
+    "detect_unreachable_branches": true,
+    "ignore_patterns": []
   },
-
-  // ============================================================================
-  // OUTPUT SETTINGS
-  // ============================================================================
   "output": {
-    // Output format: "text", "json", "html"
     "format": "text",
-
-    // Show detailed breakdown of results
-    "showDetails": true,
-
-    // Use colors in terminal output (disable for CI logs)
-    "colorize": true
+    "show_details": true,
+    "sort_by": "complexity",
+    "min_complexity": 1
   },
-
-  // ============================================================================
-  // ANALYSIS SCOPE
-  // ============================================================================
-  // Controls which files are analyzed
   "analysis": {
-    // File patterns to include (glob patterns)
-    "include": ` + includePatterns + `,
-
-    // File patterns to exclude (glob patterns)
-    "exclude": ` + excludePatterns + `,
-
-    // Maximum file size to analyze in KB (0 = no limit)
-    "maxFileSize": 1000,
-
-    // Number of parallel workers (0 = auto-detect based on CPU)
-    "workers": 0
+    "include_patterns": ` + includePatterns + `,
+    "exclude_patterns": ` + excludePatterns + `,
+    "recursive": true,
+    "follow_symlinks": false
   }
 }
 `
 }
 
-// GetMinimalConfigTemplate returns a minimal config template
+// GetMinimalConfigTemplate returns a minimal config template as valid JSON.
 func GetMinimalConfigTemplate() string {
 	return `{
-  // jscan Configuration (minimal)
-  // See full options: https://github.com/ludo-technologies/jscan
-
   "complexity": {
     "enabled": true,
-    "lowThreshold": 10,
-    "mediumThreshold": 20
+    "low_threshold": 10,
+    "medium_threshold": 20
   },
-
-  "deadCode": {
+  "dead_code": {
     "enabled": true,
-    "minSeverity": "warning"
+    "min_severity": "warning"
   },
-
   "analysis": {
-    "include": ["**/*.js", "**/*.ts", "**/*.jsx", "**/*.tsx"],
-    "exclude": ["**/node_modules/**", "**/dist/**"]
+    "include_patterns": ["**/*.js", "**/*.ts", "**/*.jsx", "**/*.tsx"],
+    "exclude_patterns": ["node_modules", "dist"]
   }
 }
 `

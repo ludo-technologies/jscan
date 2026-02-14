@@ -68,7 +68,7 @@ func TestAnalyzeCmd_NoPathsError(t *testing.T) {
 func TestCheckCmd_FlagsExist(t *testing.T) {
 	cmd := checkCmd()
 
-	expectedFlags := []string{"max-complexity", "allow-dead-code", "skip-clones", "allow-circular-deps", "max-cycles", "select", "verbose", "json"}
+	expectedFlags := []string{"max-complexity", "allow-dead-code", "allow-circular-deps", "max-cycles", "select", "verbose", "json", "config"}
 	for _, flagName := range expectedFlags {
 		flag := cmd.Flags().Lookup(flagName)
 		if flag == nil {
@@ -83,6 +83,7 @@ func TestCheckCmd_ShortFlags(t *testing.T) {
 	shortFlags := map[string]string{
 		"s": "select",
 		"v": "verbose",
+		"c": "config",
 	}
 
 	for short, long := range shortFlags {
@@ -113,7 +114,7 @@ func TestCheckExitError_Error(t *testing.T) {
 func TestDepsCmd_FlagsExist(t *testing.T) {
 	cmd := depsCmd()
 
-	expectedFlags := []string{"format", "output", "dot", "include-external", "include-types", "no-cycles", "max-depth", "min-coupling", "no-legend", "rank-dir"}
+	expectedFlags := []string{"format", "output", "config", "dot", "include-external", "include-types", "no-cycles", "max-depth", "min-coupling", "no-legend", "rank-dir"}
 	for _, flagName := range expectedFlags {
 		flag := cmd.Flags().Lookup(flagName)
 		if flag == nil {
@@ -128,6 +129,7 @@ func TestDepsCmd_ShortFlags(t *testing.T) {
 	shortFlags := map[string]string{
 		"f": "format",
 		"o": "output",
+		"c": "config",
 	}
 
 	for short, long := range shortFlags {
