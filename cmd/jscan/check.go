@@ -101,6 +101,11 @@ func runCheck(cmd *cobra.Command, args []string) error {
 		return &CheckExitError{Code: 2, Message: fmt.Sprintf("failed to load configuration: %v", err)}
 	}
 
+	// Apply config values for flags not explicitly set on CLI
+	if !cmd.Flags().Changed("max-complexity") && cfg.Complexity.MaxComplexity > 0 {
+		checkMaxComplexity = cfg.Complexity.MaxComplexity
+	}
+
 	// Collect JavaScript/TypeScript files (using exclude patterns from config)
 	var files []string
 	for _, path := range args {
