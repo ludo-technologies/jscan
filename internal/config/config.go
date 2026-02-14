@@ -369,7 +369,6 @@ func findDefaultConfig(targetPath string) string {
 	candidates := []string{
 		"jscan.config.json",
 		".jscanrc.json",
-		".jscanrc",
 		"jscan.yaml",
 		"jscan.yml",
 		".jscan.toml",

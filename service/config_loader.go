@@ -45,7 +45,6 @@ func (c *ConfigurationLoaderImpl) FindDefaultConfigFile() string {
 	configFiles := []string{
 		"jscan.config.json",
 		".jscanrc.json",
-		".jscanrc",
 		"jscan.yaml",
 		"jscan.yml",
 		".jscan.toml",
