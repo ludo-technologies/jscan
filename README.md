@@ -1,44 +1,54 @@
-# jscan - JavaScript/TypeScript Code Quality Analyzer
+<div align="center">
 
-[![CI](https://github.com/ludo-technologies/jscan/actions/workflows/ci.yml/badge.svg)](https://github.com/ludo-technologies/jscan/actions/workflows/ci.yml)
-[![Go](https://img.shields.io/badge/Go-1.24+-00ADD8?style=flat-square&logo=go)](https://go.dev/)
-[![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Status](https://img.shields.io/badge/Status-Active_Development-brightgreen.svg)](https://github.com/ludo-technologies/jscan)
+# jscan
+
+**A code quality analyzer for JavaScript/TypeScript vibe coders.**
 
 Building with Cursor, Claude, or ChatGPT? jscan performs structural analysis to keep your codebase maintainable.
 
+[![CI](https://github.com/ludo-technologies/jscan/actions/workflows/ci.yml/badge.svg)](https://github.com/ludo-technologies/jscan/actions/workflows/ci.yml)
+[![npm](https://img.shields.io/npm/v/jscan?style=flat-square&logo=npm)](https://www.npmjs.com/package/jscan)
+[![Downloads](https://img.shields.io/npm/dm/jscan?style=flat-square&logo=npm&label=downloads)](https://www.npmjs.com/package/jscan)
+[![Go](https://img.shields.io/badge/Go-1.24+-00ADD8?style=flat-square&logo=go)](https://go.dev/)
+[![License](https://img.shields.io/github/license/ludo-technologies/jscan?style=flat-square)](LICENSE)
+
+*Working with Python? Check out [pyscn](https://github.com/ludo-technologies/pyscn)*
+
+</div>
+
+## Quick Start
+
+```bash
+# Run analysis without installation
+npx jscan analyze src/
+```
 
 ## Demo
 
 https://github.com/user-attachments/assets/6c491b52-99d3-4fa4-b628-e09c0b61451d
 
-
 ## Features
 
-- **Complexity Analysis** - McCabe cyclomatic complexity with risk-level scoring
-- **Dead Code Detection** - Unreachable code, unused imports/exports, and orphan files
-- **Clone Detection** - Duplicate code identification using APTED tree edit distance + MinHash/LSH
-- **Dependency Analysis** - Module dependency graph with circular dependency detection
-- **CBO Metrics** - Coupling Between Objects measurement for module health
-- **Health Score** - Lighthouse-style overall project health scoring
-- **Multiple Output Formats** - HTML, JSON, CSV, and DOT (for graph visualization)
-- **`init` / `check` Commands** - Config scaffolding and CI/CD threshold enforcement
-- **Parallel Execution** - Concurrent file analysis for fast performance on large codebases
-- **Built with Go + tree-sitter** - Fast, error-tolerant parsing for ES6+ JavaScript and TypeScript
+- 🔍 **Dead code detection** – Unreachable code, unused imports/exports, and orphan files
+- 📋 **Multi-algorithm clone detection** – Duplicate code identification using APTED tree edit distance + MinHash/LSH
+- 🔗 **Coupling metrics (CBO)** – Track architecture quality and module dependencies
+- 📊 **Cyclomatic complexity analysis** – McCabe complexity with risk-level scoring
+- 🏥 **Health score** – Lighthouse-style overall project health scoring
+- 🔄 **Dependency analysis** – Module dependency graph with circular dependency detection
+
+**Parallel execution** • **Multiple output formats (HTML, JSON, CSV, DOT)** • Built with Go + tree-sitter
 
 ## Installation
 
-### npm (recommended)
-
 ```bash
-# Run without installing
-npx jscan analyze src/
-
-# Install globally
+# Install globally with npm (recommended)
 npm install -g jscan
 ```
 
-### From Source
+<details>
+<summary>Alternative installation methods</summary>
+
+### Build from source
 
 ```bash
 git clone https://github.com/ludo-technologies/jscan.git
@@ -46,77 +56,57 @@ cd jscan
 go build -o jscan ./cmd/jscan
 ```
 
-### Go Install
+### Go install
 
 ```bash
 go install github.com/ludo-technologies/jscan/cmd/jscan@latest
 ```
 
-## Usage
+</details>
 
-### Analyze a file or directory
+## Common Commands
+
+### `jscan analyze`
+
+Run comprehensive analysis with HTML report
 
 ```bash
-# Analyze a directory (default: HTML report)
-jscan analyze src/
-
-# Analyze a single file
-jscan analyze src/index.js
-
-# Run specific analyses
-jscan analyze --select complexity src/
-jscan analyze --select deadcode src/
-jscan analyze --select complexity,deadcode,clones src/
-
-# Choose output format
-jscan analyze --format json src/
-jscan analyze --format csv src/
-jscan analyze --format text src/
+jscan analyze src/                              # All analyses with HTML report
+jscan analyze --format json src/                # Generate JSON report
+jscan analyze --select complexity src/          # Only complexity analysis
+jscan analyze --select deadcode src/            # Only dead code analysis
+jscan analyze --select complexity,deadcode,clones src/  # Multiple analyses
 ```
 
-### Initialize configuration
+### `jscan check`
+
+Fast CI-friendly quality gate
 
 ```bash
-# Generate a jscan.config.json with defaults
-jscan init
+jscan check src/                         # Quick pass/fail check
 ```
 
-### CI/CD health check
+### `jscan init`
+
+Create configuration file
 
 ```bash
-# Fail if health score drops below thresholds
-jscan check src/
+jscan init                               # Generate jscan.config.json
 ```
 
-### Dependency visualization
+### `jscan deps`
+
+Dependency visualization
 
 ```bash
-# Output DOT graph for dependency analysis
 jscan deps src/ --format dot | dot -Tsvg -o deps.svg
 ```
 
-### Example Output
-
-```
-Analyzing 3 files...
-
-src/index.js:
-  Complexity Analysis:
-    calculateTotal: complexity=5, risk=medium
-    processData: complexity=2, risk=low
-  Dead Code Analysis:
-    calculateTotal: 1 dead code blocks found
-      Line 42: Code after return statement is unreachable
-
-Health Score: 72/100
-
-Analysis complete!
-Files analyzed: 3
-```
+> 💡 Run `jscan --help` or `jscan <command> --help` for complete options
 
 ## Configuration
 
-jscan uses JSON-based configuration files. Run `jscan init` to generate one, or create a `jscan.config.json` / `.jscanrc.json` in your project root:
+Create a `jscan.config.json` or `.jscanrc.json` in your project root:
 
 ```json
 {
@@ -136,20 +126,7 @@ jscan uses JSON-based configuration files. Run `jscan init` to generate one, or 
 }
 ```
 
-See `jscan.config.example.json` for all available options.
-
-## Architecture
-
-jscan uses a layered architecture inspired by Clean Architecture:
-
-```
-cmd -> service -> internal -> domain
-cmd -> app -> service -> internal -> domain
-```
-
-The `domain` package stays dependency-free and is shared across all layers.
-
-See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the full design documentation.
+> ⚙️ Run `jscan init` to generate a configuration file with all available options
 
 ## Roadmap
 
@@ -158,30 +135,20 @@ See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the full design documentati
 - IDE / editor integrations
 - Watch mode for continuous analysis
 
-## Development
+---
 
-```bash
-# Run unit tests
-go test ./...
+## Documentation
 
-# Lint
-make lint
+📚 **[Development Guide](docs/DEVELOPMENT.md)** • **[Architecture](docs/ARCHITECTURE.md)** • **[Testing](docs/TESTING.md)** • **[Contributing](CONTRIBUTING.md)**
 
-# Build
-make build
+## Enterprise Support
 
-# Test on sample files
-./jscan analyze testdata/javascript/simple/
-```
-
-See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup, coding conventions, and pull request guidelines.
+For commercial support, custom integrations, or consulting services, contact us at contact@ludo-tech.org
 
 ## License
 
-MIT License - see [LICENSE](LICENSE) file for details.
+MIT License — see [LICENSE](LICENSE)
 
-## Author
+---
 
-Created by [@daisukeyoda](https://github.com/daisukeyoda)
-
-Sister project: [pyscn](https://github.com/ludo-technologies/pyscn) - Python Code Quality Analyzer
+*Built with ❤️ using Go and tree-sitter*
