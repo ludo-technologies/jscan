@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-02-15
+
+### Changed
+
+- Redesign README to match pyscn style (centered header, Quick Start, collapsible install)
+- Add algorithm details to Features section
+- Add demo video link
+
 ## [0.4.0] - 2026-02-15
 
 ### Changed
@@ -104,7 +112,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - CLI with analyze command
 - Configuration file support (jscan.config.json)
 
-[Unreleased]: https://github.com/ludo-technologies/jscan/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/ludo-technologies/jscan/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/ludo-technologies/jscan/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/ludo-technologies/jscan/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/ludo-technologies/jscan/compare/v0.2.2...v0.3.0
 [0.2.2]: https://github.com/ludo-technologies/jscan/compare/v0.2.1...v0.2.2
