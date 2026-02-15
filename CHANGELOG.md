@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-02-15
+
+### Fixed
+
+- Stop counting nested functions' operators in parent complexity
+- Resolve npx "command not found" by removing bin field from platform packages
+- Add files field to main npm package to reduce package size
+
 ## [0.5.0] - 2026-02-15
 
 ### Changed
@@ -112,7 +120,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - CLI with analyze command
 - Configuration file support (jscan.config.json)
 
-[Unreleased]: https://github.com/ludo-technologies/jscan/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/ludo-technologies/jscan/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/ludo-technologies/jscan/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/ludo-technologies/jscan/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/ludo-technologies/jscan/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/ludo-technologies/jscan/compare/v0.2.2...v0.3.0
