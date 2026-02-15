@@ -3,7 +3,7 @@ module github.com/ludo-technologies/jscan
 go 1.24.6
 
 require (
-	github.com/ludo-technologies/codescan-core v0.1.0
+	github.com/ludo-technologies/codescan-core v0.1.1
 	github.com/manifoldco/promptui v0.9.0
 	github.com/sabhiram/go-gitignore v0.0.0-20210923224102-525f6e181f06
 	github.com/schollz/progressbar/v3 v3.19.0

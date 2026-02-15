@@ -102,10 +102,7 @@ func CalculateComplexityWithConfig(cfg *corecfg.CFG, complexityConfig *config.Co
 		}
 	}
 
-	// corecfg counts blocks with EdgeLoop back-edges as decision points, but
-	// jscan's CFG already creates EdgeCondTrue/EdgeCondFalse at loop headers.
-	// Subtract loop back-edges to avoid double-counting each loop.
-	complexity := coreResult.McCabe - loopStatements
+	complexity := coreResult.McCabe
 	if complexity < 1 {
 		complexity = 1
 	}
