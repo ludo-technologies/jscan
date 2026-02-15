@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-02-15
+
+### Changed
+
+- Refactor dead code aggregation into dedicated service layer and align architecture docs
+
+### Fixed
+
+- Improve progress bar UX and speed up clone analysis (#46)
+
 ## [0.3.0] - 2026-02-14
 
 ### Changed
@@ -94,7 +104,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - CLI with analyze command
 - Configuration file support (jscan.config.json)
 
-[Unreleased]: https://github.com/ludo-technologies/jscan/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/ludo-technologies/jscan/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/ludo-technologies/jscan/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/ludo-technologies/jscan/compare/v0.2.2...v0.3.0
 [0.2.2]: https://github.com/ludo-technologies/jscan/compare/v0.2.1...v0.2.2
 [0.2.1]: https://github.com/ludo-technologies/jscan/compare/v0.2.0...v0.2.1
