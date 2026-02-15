@@ -89,6 +89,7 @@ func (b *CFGBuilder) Build(node *parser.Node) (*CFG, error) {
 	}
 
 	b.cfg = NewCFG(cfgName)
+	b.cfg.FunctionNode = node
 	b.currentBlock = b.cfg.Entry
 
 	// Build CFG based on node type

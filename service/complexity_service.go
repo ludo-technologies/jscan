@@ -141,10 +141,11 @@ func (s *ComplexityServiceImpl) analyzeFile(ctx context.Context, filePath string
 
 		// Convert to domain model
 		funcComplexity := domain.FunctionComplexity{
-			Name:      funcName,
-			FilePath:  filePath,
-			StartLine: result.StartLine,
-			EndLine:   result.EndLine,
+			Name:        funcName,
+			FilePath:    filePath,
+			StartLine:   result.StartLine,
+			StartColumn: result.StartCol,
+			EndLine:     result.EndLine,
 			Metrics: domain.ComplexityMetrics{
 				Complexity:        result.Complexity,
 				Nodes:             result.Nodes,
