@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"math"
 	"os"
 	"path/filepath"
 	"sync"
@@ -132,7 +133,7 @@ func runAnalyze(cmd *cobra.Command, args []string) error {
 	var progressDone chan struct{}
 	if pm.IsInteractive() {
 		task = pm.StartTask("Analyzing", 100)
-		estimatedDuration := estimateAnalysisDuration(len(files), runComplexity, runDeadCode)
+		estimatedDuration := estimateAnalysisDuration(len(files), runComplexity, runDeadCode, runClone, runCBO, runDeps)
 		progressDone = startTimeBasedProgressUpdater(task, estimatedDuration)
 	}
 
@@ -207,6 +208,7 @@ func runAnalyze(cmd *cobra.Command, args []string) error {
 		close(progressDone)
 	}
 	if task != nil {
+		task.Describe("Analyzing...")
 		task.Complete()
 	}
 
@@ -345,22 +347,67 @@ func contains(slice []string, item string) bool {
 
 // estimateAnalysisDuration estimates total analysis time based on file count.
 // Since analyses run in parallel, the time is based on the slower analysis (not the sum).
-func estimateAnalysisDuration(fileCount int, _, _ bool) time.Duration {
-	perFileMs := 10.0
+func estimateAnalysisDuration(fileCount int, runComplexity, runDeadCode, runClone, runCBO, runDeps bool) time.Duration {
+	perFileMs := 20.0
+
+	if runComplexity {
+		perFileMs = math.Max(perFileMs, 20.0)
+	}
+	if runDeadCode {
+		perFileMs = math.Max(perFileMs, 35.0)
+	}
+	if runClone {
+		perFileMs = math.Max(perFileMs, 45.0)
+	}
+	if runCBO {
+		perFileMs = math.Max(perFileMs, 25.0)
+	}
+	if runDeps {
+		perFileMs = math.Max(perFileMs, 20.0)
+	}
 
 	estimatedMs := float64(fileCount) * perFileMs
-	if estimatedMs < 100 {
-		estimatedMs = 100
+	if estimatedMs < 3000 {
+		estimatedMs = 3000
 	}
-	estimatedMs *= 1.5 // buffer
+	estimatedMs *= 1.25 // buffer
 
 	return time.Duration(estimatedMs) * time.Millisecond
+}
+
+func calculateProgressPercent(elapsed, estimatedDuration time.Duration) int {
+	if estimatedDuration <= 0 || elapsed <= 0 {
+		return 0
+	}
+
+	// Phase 1: quickly reach up to 90% around the estimated completion time.
+	if elapsed <= estimatedDuration {
+		return int((float64(elapsed) / float64(estimatedDuration)) * 90)
+	}
+
+	// Phase 2: slowly approach 99% so long-running analyses do not appear stuck.
+	tailDuration := estimatedDuration * 4
+	if tailDuration <= 0 {
+		tailDuration = time.Second
+	}
+
+	tailRatio := float64(elapsed-estimatedDuration) / float64(tailDuration)
+	if tailRatio > 1 {
+		tailRatio = 1
+	}
+
+	progress := 90 + int(tailRatio*9)
+	if progress > 99 {
+		return 99
+	}
+	return progress
 }
 
 // startTimeBasedProgressUpdater starts background progress updates
 func startTimeBasedProgressUpdater(task domain.TaskProgress, estimatedDuration time.Duration) chan struct{} {
 	done := make(chan struct{})
 	startTime := time.Now()
+	lastProgress := 0
 
 	go func() {
 		ticker := time.NewTicker(100 * time.Millisecond)
@@ -370,11 +417,12 @@ func startTimeBasedProgressUpdater(task domain.TaskProgress, estimatedDuration t
 			select {
 			case <-ticker.C:
 				elapsed := time.Since(startTime)
-				progress := int((float64(elapsed) / float64(estimatedDuration)) * 100)
-				if progress > 99 {
-					progress = 99
+				progress := calculateProgressPercent(elapsed, estimatedDuration)
+				if delta := progress - lastProgress; delta > 0 {
+					task.Increment(delta)
+					lastProgress = progress
 				}
-				task.Describe(fmt.Sprintf("Analyzing... %d%%", progress))
+				task.Describe("Analyzing...")
 			case <-done:
 				return
 			}

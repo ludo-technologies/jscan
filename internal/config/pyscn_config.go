@@ -304,7 +304,7 @@ func DefaultPyscnConfig() *PyscnConfig {
 		},
 		LSH: LSHConfig{
 			Enabled:             "auto", // Auto-enable based on project size
-			AutoThreshold:       500,    // Enable LSH for 500+ fragments
+			AutoThreshold:       200,    // Enable LSH for 200+ fragments
 			SimilarityThreshold: 0.50,
 			Bands:               32,
 			Rows:                4,
