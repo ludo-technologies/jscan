@@ -1,32 +1,15 @@
 ---
 name: Bug Report
-about: Report a bug to help us improve jscan
+about: Report a bug
 title: "bug: "
 labels: bug
 assignees: ""
 ---
 
-## Describe the bug
+**What happened?**
 
-A clear and concise description of what the bug is.
+**Steps to reproduce**
 
-## To Reproduce
-
-Steps to reproduce the behavior:
-
-1. Run `jscan ...`
-2. See error
-
-## Expected behavior
-
-A clear and concise description of what you expected to happen.
-
-## Environment
-
-- jscan version: (run `jscan --version`)
-- OS: (e.g., macOS 15, Ubuntu 24.04)
-- Node.js version (if installed via npm):
-
-## Additional context
-
-Add any other context, logs, or screenshots about the problem here.
+**Environment**
+- jscan version:
+- OS:
