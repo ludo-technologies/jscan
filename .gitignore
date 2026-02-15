@@ -73,3 +73,6 @@ test-repos/
 # JavaScript test artifacts
 *.bundle.js
 *.map
+
+# Demo video project
+video/
