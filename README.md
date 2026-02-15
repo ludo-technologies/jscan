@@ -29,12 +29,12 @@ https://github.com/user-attachments/assets/6c491b52-99d3-4fa4-b628-e09c0b61451d
 
 ## Features
 
-- 🔍 **Dead code detection** – Unreachable code, unused imports/exports, and orphan files
-- 📋 **Multi-algorithm clone detection** – Duplicate code identification using APTED tree edit distance + MinHash/LSH
-- 🔗 **Coupling metrics (CBO)** – Track architecture quality and module dependencies
-- 📊 **Cyclomatic complexity analysis** – McCabe complexity with risk-level scoring
-- 🏥 **Health score** – Lighthouse-style overall project health scoring
-- 🔄 **Dependency analysis** – Module dependency graph with circular dependency detection
+- **Dead code detection** – Unreachable code, unused imports/exports, and orphan files
+- **Multi-algorithm clone detection** – Duplicate code identification using APTED tree edit distance + MinHash/LSH
+- **Coupling metrics (CBO)** – Track architecture quality and module dependencies
+- **Cyclomatic complexity analysis** – McCabe complexity with risk-level scoring
+- **Health score** – Lighthouse-style overall project health scoring
+- **Dependency analysis** – Module dependency graph with circular dependency detection
 
 **Parallel execution** • **Multiple output formats (HTML, JSON, CSV, DOT)** • Built with Go + tree-sitter
 
