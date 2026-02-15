@@ -139,6 +139,17 @@ function complex(x) {
 	if resp.Summary.TotalFunctions == 0 {
 		t.Error("Summary should have total functions")
 	}
+
+	foundValidLocation := false
+	for _, fn := range resp.Functions {
+		if fn.StartLine > 0 && fn.EndLine >= fn.StartLine {
+			foundValidLocation = true
+			break
+		}
+	}
+	if !foundValidLocation {
+		t.Error("At least one function should include valid line location metadata")
+	}
 }
 
 func TestComplexityService_Analyze_ContextCancellation(t *testing.T) {

@@ -113,6 +113,39 @@ func TestCalculateComplexity_SimpleCFG(t *testing.T) {
 	}
 }
 
+func TestCalculateComplexity_UsesFunctionLocation(t *testing.T) {
+	code := `
+		function locateMe(value) {
+			if (value) {
+				return 1;
+			}
+			return 0;
+		}
+	`
+	ast := parseJS(t, code)
+	funcNode := findFunction(ast, "locateMe")
+	if funcNode == nil {
+		t.Fatal("Function node should not be nil")
+	}
+
+	builder := NewCFGBuilder()
+	cfg, err := builder.Build(funcNode)
+	if err != nil {
+		t.Fatalf("Build failed: %v", err)
+	}
+
+	result := CalculateComplexity(cfg)
+	if result.StartLine != funcNode.Location.StartLine {
+		t.Errorf("StartLine mismatch: got %d, want %d", result.StartLine, funcNode.Location.StartLine)
+	}
+	if result.StartCol != funcNode.Location.StartCol {
+		t.Errorf("StartCol mismatch: got %d, want %d", result.StartCol, funcNode.Location.StartCol)
+	}
+	if result.EndLine != funcNode.Location.EndLine {
+		t.Errorf("EndLine mismatch: got %d, want %d", result.EndLine, funcNode.Location.EndLine)
+	}
+}
+
 func TestCalculateComplexity_WithConditional(t *testing.T) {
 	code := `
 		function test(x) {

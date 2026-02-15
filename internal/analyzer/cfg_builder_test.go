@@ -867,6 +867,35 @@ func TestCFGBuilder_BuildAll(t *testing.T) {
 	}
 }
 
+func TestCFGBuilder_Build_SetsFunctionNode(t *testing.T) {
+	code := `
+		function sample() {
+			return 42;
+		}
+	`
+	ast := parseJS(t, code)
+	funcNode := findFunction(ast, "sample")
+	if funcNode == nil {
+		t.Fatal("Function node should not be nil")
+	}
+
+	builder := NewCFGBuilder()
+	cfg, err := builder.Build(funcNode)
+	if err != nil {
+		t.Fatalf("Build failed: %v", err)
+	}
+
+	if cfg.FunctionNode == nil {
+		t.Fatal("FunctionNode should be set on CFG")
+	}
+	if cfg.FunctionNode.Location.StartLine != funcNode.Location.StartLine {
+		t.Errorf("FunctionNode start line mismatch: got %d, want %d", cfg.FunctionNode.Location.StartLine, funcNode.Location.StartLine)
+	}
+	if cfg.FunctionNode.Location.EndLine != funcNode.Location.EndLine {
+		t.Errorf("FunctionNode end line mismatch: got %d, want %d", cfg.FunctionNode.Location.EndLine, funcNode.Location.EndLine)
+	}
+}
+
 func TestCFGBuilder_BuildAll_NilNode(t *testing.T) {
 	builder := NewCFGBuilder()
 	cfgs, err := builder.BuildAll(nil)
