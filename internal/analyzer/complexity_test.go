@@ -3,6 +3,7 @@ package analyzer
 import (
 	"testing"
 
+	corecfg "github.com/ludo-technologies/codescan-core/cfg"
 	"github.com/ludo-technologies/jscan/internal/config"
 	"github.com/ludo-technologies/jscan/internal/parser"
 )
@@ -99,8 +100,8 @@ func TestCalculateComplexity_NilCFG(t *testing.T) {
 
 func TestCalculateComplexity_SimpleCFG(t *testing.T) {
 	// Simple function: just entry and exit
-	cfg := NewCFG("simpleFunc")
-	cfg.ConnectBlocks(cfg.Entry, cfg.Exit, EdgeNormal)
+	cfg := corecfg.NewCFG("simpleFunc")
+	cfg.ConnectBlocks(cfg.Entry, cfg.Exit, corecfg.EdgeNormal)
 
 	result := CalculateComplexity(cfg)
 
@@ -271,16 +272,16 @@ func TestCalculateComplexity_WithTernaryOperator(t *testing.T) {
 }
 
 func TestCalculateComplexityWithConfig_CustomThresholds(t *testing.T) {
-	cfg := NewCFG("test")
+	cfg := corecfg.NewCFG("test")
 	block := cfg.CreateBlock("body")
-	cfg.ConnectBlocks(cfg.Entry, block, EdgeNormal)
-	cfg.ConnectBlocks(block, cfg.Exit, EdgeNormal)
+	cfg.ConnectBlocks(cfg.Entry, block, corecfg.EdgeNormal)
+	cfg.ConnectBlocks(block, cfg.Exit, corecfg.EdgeNormal)
 
 	// Add multiple decision points manually
 	for range 5 {
 		b := cfg.CreateBlock("")
-		cfg.ConnectBlocks(block, b, EdgeCondTrue)
-		cfg.ConnectBlocks(block, b, EdgeCondFalse)
+		cfg.ConnectBlocks(block, b, corecfg.EdgeCondTrue)
+		cfg.ConnectBlocks(block, b, corecfg.EdgeCondFalse)
 	}
 
 	// Test with low thresholds
@@ -568,75 +569,6 @@ func TestComplexityAnalyzer_AnalyzeFile_ComplexFunction(t *testing.T) {
 	// Complex function should have high complexity
 	if complexResult.Complexity < 5 {
 		t.Errorf("Complex function should have complexity >= 5, got %d", complexResult.Complexity)
-	}
-}
-
-func TestComplexityVisitor_VisitBlock_Nil(t *testing.T) {
-	visitor := &complexityVisitor{
-		decisionPoints: make(map[*BasicBlock]int),
-	}
-
-	// Should not panic with nil block
-	result := visitor.VisitBlock(nil)
-	if !result {
-		t.Error("VisitBlock with nil should return true to continue")
-	}
-}
-
-func TestComplexityVisitor_VisitEdge_Nil(t *testing.T) {
-	visitor := &complexityVisitor{
-		decisionPoints: make(map[*BasicBlock]int),
-	}
-
-	// Should not panic with nil edge
-	result := visitor.VisitEdge(nil)
-	if !result {
-		t.Error("VisitEdge with nil should return true to continue")
-	}
-}
-
-func TestComplexityVisitor_VisitBlock_CountsNodes(t *testing.T) {
-	visitor := &complexityVisitor{
-		decisionPoints: make(map[*BasicBlock]int),
-	}
-
-	// Entry and exit blocks should not be counted
-	entryBlock := &BasicBlock{ID: "entry", IsEntry: true}
-	exitBlock := &BasicBlock{ID: "exit", IsExit: true}
-	regularBlock := &BasicBlock{ID: "regular"}
-
-	visitor.VisitBlock(entryBlock)
-	visitor.VisitBlock(exitBlock)
-	visitor.VisitBlock(regularBlock)
-
-	if visitor.nodeCount != 1 {
-		t.Errorf("Only regular block should be counted, got %d", visitor.nodeCount)
-	}
-}
-
-func TestComplexityVisitor_VisitEdge_CountsEdges(t *testing.T) {
-	visitor := &complexityVisitor{
-		decisionPoints: make(map[*BasicBlock]int),
-	}
-
-	block1 := &BasicBlock{ID: "b1"}
-	block2 := &BasicBlock{ID: "b2"}
-
-	edges := []*Edge{
-		{From: block1, To: block2, Type: EdgeNormal},
-		{From: block1, To: block2, Type: EdgeCondTrue},
-		{From: block1, To: block2, Type: EdgeLoop},
-	}
-
-	for _, edge := range edges {
-		visitor.VisitEdge(edge)
-	}
-
-	if visitor.edgeCount != 3 {
-		t.Errorf("Should count 3 edges, got %d", visitor.edgeCount)
-	}
-	if visitor.loopStatements != 1 {
-		t.Errorf("Should count 1 loop statement, got %d", visitor.loopStatements)
 	}
 }
 

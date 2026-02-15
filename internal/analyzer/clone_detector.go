@@ -7,6 +7,9 @@ import (
 	"runtime"
 	"sort"
 
+	"github.com/ludo-technologies/codescan-core/apted"
+	coreclone "github.com/ludo-technologies/codescan-core/clone"
+	"github.com/ludo-technologies/codescan-core/lsh"
 	"github.com/ludo-technologies/jscan/domain"
 	"github.com/ludo-technologies/jscan/internal/constants"
 	"github.com/ludo-technologies/jscan/internal/parser"
@@ -30,7 +33,7 @@ func (cl *CodeLocation) String() string {
 type CodeFragment struct {
 	Location   *CodeLocation
 	ASTNode    *parser.Node
-	TreeNode   *TreeNode
+	TreeNode   *apted.TreeNode
 	Content    string // Original source code content
 	Hash       string // Hash for quick comparison
 	Size       int    // Number of AST nodes
@@ -160,7 +163,7 @@ type CloneDetector struct {
 	// Embed config fields (private to maintain encapsulation)
 	cloneDetectorConfig CloneDetectorConfig
 
-	analyzer    *APTEDAnalyzer
+	analyzer    *apted.APTEDAnalyzer
 	converter   *TreeConverter
 	fragments   []*CodeFragment
 	clonePairs  []*domain.ClonePair
@@ -170,20 +173,21 @@ type CloneDetector struct {
 // NewCloneDetector creates a new clone detector with the given configuration
 func NewCloneDetector(config *CloneDetectorConfig) *CloneDetector {
 	// Create appropriate cost model based on configuration
-	var costModel CostModel
+	var costModel apted.CostModel
 	switch config.CostModelType {
 	case "default":
-		costModel = NewDefaultCostModel()
+		costModel = apted.NewDefaultCostModel()
 	case "javascript":
 		costModel = NewJavaScriptCostModelWithConfig(config.IgnoreLiterals, config.IgnoreIdentifiers)
 	case "weighted":
 		baseCostModel := NewJavaScriptCostModelWithConfig(config.IgnoreLiterals, config.IgnoreIdentifiers)
-		costModel = NewWeightedCostModel(1.0, 1.0, 0.8, baseCostModel)
+		costModel = apted.NewWeightedCostModel(1.0, 1.0, 0.8, baseCostModel)
 	default:
 		costModel = NewJavaScriptCostModel()
 	}
 
-	analyzer := NewAPTEDAnalyzer(costModel)
+	// jscan uses NormalizeBySum for similarity computation
+	analyzer := apted.NewAPTEDAnalyzerWithNormalization(costModel, apted.NormalizeBySum)
 
 	return &CloneDetector{
 		cloneDetectorConfig: *config,
@@ -372,6 +376,31 @@ func (cd *CloneDetector) DetectClonesWithContext(ctx context.Context, fragments 
 	return cd.clonePairs, cd.cloneGroups
 }
 
+// jsPatternNames are the JavaScript/TypeScript node types used for structural pattern features.
+var jsPatternNames = []string{
+	// Control flow
+	"IfStatement", "SwitchStatement", "ForStatement", "ForInStatement", "ForOfStatement",
+	"WhileStatement", "DoWhileStatement", "TryStatement", "WithStatement",
+	// Function patterns
+	"FunctionDeclaration", "FunctionExpression", "ArrowFunctionExpression",
+	"MethodDefinition", "AsyncFunctionDeclaration", "GeneratorFunctionDeclaration",
+	// Class patterns
+	"ClassDeclaration", "ClassExpression",
+	// Common statements
+	"ReturnStatement", "ThrowStatement", "BreakStatement", "ContinueStatement",
+	// Variable patterns
+	"VariableDeclaration", "AssignmentExpression",
+	// Expression patterns
+	"CallExpression", "MemberExpression", "BinaryExpression", "LogicalExpression",
+	"ConditionalExpression", "NewExpression", "AwaitExpression", "YieldExpression",
+	// Module patterns
+	"ImportDeclaration", "ExportNamedDeclaration", "ExportDefaultDeclaration",
+	// TypeScript specific
+	"InterfaceDeclaration", "TypeAliasDeclaration", "EnumDeclaration",
+	// JSX patterns
+	"JSXElement", "JSXFragment",
+}
+
 // DetectClonesWithLSH runs a two-stage pipeline using LSH for candidate generation,
 // followed by APTED verification on candidates only. Falls back to exhaustive if misconfigured.
 func (cd *CloneDetector) DetectClonesWithLSH(ctx context.Context, fragments []*CodeFragment) ([]*domain.ClonePair, []*domain.CloneGroup) {
@@ -396,21 +425,21 @@ func (cd *CloneDetector) DetectClonesWithLSH(ctx context.Context, fragments []*C
 	}
 
 	// Stage 1: Feature extraction and MinHash signatures
-	extractor := NewASTFeatureExtractor().WithOptions(
-		maxInt(1, cd.cloneDetectorConfig.LSHRows), // reuse rows for subtree height if >0
-		maxInt(2, 4), // keep default k=4
+	extractor := coreclone.NewASTFeatureExtractor().WithOptions(
+		max(1, cd.cloneDetectorConfig.LSHRows), // reuse rows for subtree height if >0
+		max(2, 4),                              // keep default k=4
 		true,
 		false,
-	)
-	hasher := NewMinHasher(cd.cloneDetectorConfig.LSHMinHashCount)
+	).WithPatterns(jsPatternNames)
+	hasher := lsh.NewMinHasher(cd.cloneDetectorConfig.LSHMinHashCount)
 
 	type fragRec struct {
 		id  string
 		idx int
-		sig *MinHashSignature
+		sig *lsh.MinHashSignature
 	}
 	records := make([]fragRec, 0, len(cd.fragments))
-	sigByIndex := make(map[int]*MinHashSignature, len(cd.fragments))
+	sigByIndex := make(map[int]*lsh.MinHashSignature, len(cd.fragments))
 	idToIndex := make(map[string]int, len(cd.fragments))
 	for i, f := range cd.fragments {
 		if f == nil || f.TreeNode == nil {
@@ -432,11 +461,11 @@ func (cd *CloneDetector) DetectClonesWithLSH(ctx context.Context, fragments []*C
 	}
 
 	// Stage 2: LSH indexing
-	lsh := NewLSHIndex(cd.cloneDetectorConfig.LSHBands, cd.cloneDetectorConfig.LSHRows)
+	lshIndex := lsh.NewLSHIndex(cd.cloneDetectorConfig.LSHBands, cd.cloneDetectorConfig.LSHRows)
 	for _, r := range records {
-		_ = lsh.AddFragment(r.id, r.sig)
+		_ = lshIndex.AddFragment(r.id, r.sig)
 	}
-	_ = lsh.BuildIndex()
+	_ = lshIndex.BuildIndex()
 
 	// Stage 3: Candidate generation + APTED verification
 	// Use MinHash similarity to filter before expensive APTED
@@ -453,7 +482,7 @@ func (cd *CloneDetector) DetectClonesWithLSH(ctx context.Context, fragments []*C
 		if isCancelled(ctx) {
 			break
 		}
-		cands := lsh.FindCandidates(r.sig)
+		cands := lshIndex.FindCandidates(r.sig)
 		for _, cid := range cands {
 			j := idToIndex[cid]
 			i := r.idx
@@ -532,7 +561,7 @@ func (cd *CloneDetector) prepareFragments() {
 		if fragment.ASTNode != nil {
 			fragment.TreeNode = cd.converter.ConvertAST(fragment.ASTNode)
 			if fragment.TreeNode != nil {
-				PrepareTreeForAPTED(fragment.TreeNode)
+				apted.PrepareTreeForAPTED(fragment.TreeNode)
 			}
 		}
 	}
@@ -774,8 +803,8 @@ func (cd *CloneDetector) calculateConfidence(fragment1, fragment2 *CodeFragment,
 
 	// Increase confidence if both fragments have similar complexity
 	if fragment1.Complexity > 0 && fragment2.Complexity > 0 {
-		complexityRatio := float64(minInt(fragment1.Complexity, fragment2.Complexity)) /
-			float64(maxInt(fragment1.Complexity, fragment2.Complexity))
+		complexityRatio := float64(min(fragment1.Complexity, fragment2.Complexity)) /
+			float64(max(fragment1.Complexity, fragment2.Complexity))
 		confidence += complexityRatio * 0.1 // Up to 10% bonus for similar complexity
 	}
 
@@ -907,20 +936,3 @@ func (cd *CloneDetector) limitAndSortClonePairs(maxPairs int) {
 		cd.clonePairs = cd.clonePairs[:maxPairs]
 	}
 }
-
-// Helper functions
-func absInt(x int) int {
-	if x < 0 {
-		return -x
-	}
-	return x
-}
-
-func maxInt(a, b int) int {
-	if a > b {
-		return a
-	}
-	return b
-}
-
-// minInt is defined in minhash.go

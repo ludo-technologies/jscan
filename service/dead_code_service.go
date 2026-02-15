@@ -7,6 +7,7 @@ import (
 	"sort"
 	"time"
 
+	corecfg "github.com/ludo-technologies/codescan-core/cfg"
 	"github.com/ludo-technologies/jscan/domain"
 	"github.com/ludo-technologies/jscan/internal/analyzer"
 	"github.com/ludo-technologies/jscan/internal/parser"
@@ -84,7 +85,7 @@ func (s *DeadCodeServiceImpl) AnalyzeFile(ctx context.Context, filePath string, 
 
 // AnalyzeFunction analyzes a single function for dead code
 func (s *DeadCodeServiceImpl) AnalyzeFunction(ctx context.Context, functionCFG interface{}, req domain.DeadCodeRequest) (*domain.FunctionDeadCode, error) {
-	cfg, ok := functionCFG.(*analyzer.CFG)
+	cfg, ok := functionCFG.(*corecfg.CFG)
 	if !ok {
 		return nil, domain.NewInvalidInputError("invalid CFG type", nil)
 	}

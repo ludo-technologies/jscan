@@ -1,5 +1,7 @@
 package domain
 
+import "sort"
+
 // DependencyEdgeType represents the type of dependency relationship
 type DependencyEdgeType string
 
@@ -225,4 +227,51 @@ type DependencyGraphResponse struct {
 
 	// Version is the tool version
 	Version string `json:"version"`
+}
+
+// DirectedGraphAdapter wraps DependencyGraph to implement graph.DirectedGraph
+type DirectedGraphAdapter struct {
+	Graph *DependencyGraph
+}
+
+// NodeIDs returns all node identifiers sorted lexicographically.
+func (a *DirectedGraphAdapter) NodeIDs() []string {
+	ids := a.Graph.GetAllNodeIDs()
+	sort.Strings(ids)
+	return ids
+}
+
+// Successors returns the IDs of nodes that this node has edges to.
+// Only includes nodes that exist in the graph (filters external/unresolved).
+func (a *DirectedGraphAdapter) Successors(nodeID string) []string {
+	edges := a.Graph.GetOutgoingEdges(nodeID)
+	ids := make([]string, 0, len(edges))
+	for _, e := range edges {
+		if a.Graph.GetNode(e.To) != nil {
+			ids = append(ids, e.To)
+		}
+	}
+	sort.Strings(ids)
+	return ids
+}
+
+// Predecessors returns the IDs of nodes that have edges to this node.
+func (a *DirectedGraphAdapter) Predecessors(nodeID string) []string {
+	edges := a.Graph.GetIncomingEdges(nodeID)
+	ids := make([]string, 0, len(edges))
+	for _, e := range edges {
+		ids = append(ids, e.From)
+	}
+	sort.Strings(ids)
+	return ids
+}
+
+// NodeCount returns the number of nodes.
+func (a *DirectedGraphAdapter) NodeCount() int {
+	return a.Graph.NodeCount()
+}
+
+// HasNode returns true if the node exists.
+func (a *DirectedGraphAdapter) HasNode(nodeID string) bool {
+	return a.Graph.GetNode(nodeID) != nil
 }

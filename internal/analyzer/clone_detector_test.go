@@ -395,28 +395,20 @@ func TestShouldCompareFragments(t *testing.T) {
 	}
 }
 
-func TestHelperFunctions(t *testing.T) {
-	// Test absInt
-	if absInt(-5) != 5 {
-		t.Error("absInt(-5) should be 5")
+func TestBuiltinMinMax(t *testing.T) {
+	// Test Go builtin max
+	if max(3, 5) != 5 {
+		t.Error("max(3, 5) should be 5")
 	}
-	if absInt(5) != 5 {
-		t.Error("absInt(5) should be 5")
-	}
-
-	// Test maxInt
-	if maxInt(3, 5) != 5 {
-		t.Error("maxInt(3, 5) should be 5")
-	}
-	if maxInt(5, 3) != 5 {
-		t.Error("maxInt(5, 3) should be 5")
+	if max(5, 3) != 5 {
+		t.Error("max(5, 3) should be 5")
 	}
 
-	// Test minInt
-	if minInt(3, 5) != 3 {
-		t.Error("minInt(3, 5) should be 3")
+	// Test Go builtin min
+	if min(3, 5) != 3 {
+		t.Error("min(3, 5) should be 3")
 	}
-	if minInt(5, 3) != 3 {
-		t.Error("minInt(5, 3) should be 3")
+	if min(5, 3) != 3 {
+		t.Error("min(5, 3) should be 3")
 	}
 }

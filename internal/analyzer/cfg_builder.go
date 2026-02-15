@@ -5,6 +5,7 @@ import (
 	"log"
 	"strconv"
 
+	corecfg "github.com/ludo-technologies/codescan-core/cfg"
 	"github.com/ludo-technologies/jscan/internal/parser"
 )
 
@@ -34,23 +35,23 @@ const (
 
 // loopContext tracks the context of a loop for break/continue handling
 type loopContext struct {
-	headerBlock *BasicBlock // Loop condition/iterator block
-	exitBlock   *BasicBlock // Loop exit point
-	loopType    string      // "for", "while", "for-in", "for-of"
+	headerBlock *corecfg.BasicBlock // Loop condition/iterator block
+	exitBlock   *corecfg.BasicBlock // Loop exit point
+	loopType    string              // "for", "while", "for-in", "for-of"
 }
 
 // exceptionContext tracks the context of a try block for exception handling
 type exceptionContext struct {
-	catchBlock   *BasicBlock // Catch block (optional)
-	finallyBlock *BasicBlock // Finally block (optional)
+	catchBlock   *corecfg.BasicBlock // Catch block (optional)
+	finallyBlock *corecfg.BasicBlock // Finally block (optional)
 }
 
 // CFGBuilder builds control flow graphs from AST nodes
 type CFGBuilder struct {
-	cfg            *CFG
-	currentBlock   *BasicBlock
+	cfg            *corecfg.CFG
+	currentBlock   *corecfg.BasicBlock
 	scopeStack     []string
-	functionCFGs   map[string]*CFG
+	functionCFGs   map[string]*corecfg.CFG
 	blockCounter   uint
 	logger         *log.Logger
 	loopStack      []*loopContext
@@ -61,7 +62,7 @@ type CFGBuilder struct {
 func NewCFGBuilder() *CFGBuilder {
 	return &CFGBuilder{
 		scopeStack:     []string{},
-		functionCFGs:   make(map[string]*CFG),
+		functionCFGs:   make(map[string]*corecfg.CFG),
 		blockCounter:   0,
 		logger:         nil,
 		loopStack:      []*loopContext{},
@@ -75,7 +76,7 @@ func (b *CFGBuilder) SetLogger(logger *log.Logger) {
 }
 
 // Build constructs a CFG from an AST node
-func (b *CFGBuilder) Build(node *parser.Node) (*CFG, error) {
+func (b *CFGBuilder) Build(node *parser.Node) (*corecfg.CFG, error) {
 	if node == nil {
 		return nil, fmt.Errorf("cannot build CFG from nil node")
 	}
@@ -88,7 +89,7 @@ func (b *CFGBuilder) Build(node *parser.Node) (*CFG, error) {
 		cfgName = node.Name
 	}
 
-	b.cfg = NewCFG(cfgName)
+	b.cfg = corecfg.NewCFG(cfgName)
 	b.currentBlock = b.cfg.Entry
 
 	// Build CFG based on node type
@@ -107,7 +108,7 @@ func (b *CFGBuilder) Build(node *parser.Node) (*CFG, error) {
 
 	// Connect current block to exit if not already connected
 	if b.currentBlock != nil && b.currentBlock != b.cfg.Exit && !b.hasSuccessor(b.currentBlock, b.cfg.Exit) {
-		b.cfg.ConnectBlocks(b.currentBlock, b.cfg.Exit, EdgeNormal)
+		b.cfg.ConnectBlocks(b.currentBlock, b.cfg.Exit, corecfg.EdgeNormal)
 	}
 
 	return b.cfg, nil
@@ -123,12 +124,12 @@ func resolveFunctionName(node *parser.Node) string {
 }
 
 // BuildAll builds CFGs for all functions in the AST
-func (b *CFGBuilder) BuildAll(node *parser.Node) (map[string]*CFG, error) {
+func (b *CFGBuilder) BuildAll(node *parser.Node) (map[string]*corecfg.CFG, error) {
 	if node == nil {
 		return nil, fmt.Errorf("cannot build CFGs from nil node")
 	}
 
-	allCFGs := make(map[string]*CFG)
+	allCFGs := make(map[string]*corecfg.CFG)
 
 	// Build main CFG
 	mainCFG, err := b.Build(node)
@@ -148,7 +149,11 @@ func (b *CFGBuilder) BuildAll(node *parser.Node) (map[string]*CFG, error) {
 	discoveredLocations := make(map[string]bool)
 	for _, cfg := range allCFGs {
 		for _, block := range cfg.Blocks {
-			for _, stmt := range block.Statements {
+			for _, rawStmt := range block.Statements {
+				stmt, ok := rawStmt.(*parser.Node)
+				if !ok || stmt == nil {
+					continue
+				}
 				if stmt.IsFunction() {
 					key := fmt.Sprintf("%d:%d", stmt.Location.StartLine, stmt.Location.StartCol)
 					discoveredLocations[key] = true
@@ -310,11 +315,11 @@ func (b *CFGBuilder) buildIfStatement(node *parser.Node) {
 
 	// Create blocks for then, else, and merge
 	thenBlock := b.newBlock("if_then")
-	var elseBlock *BasicBlock
+	var elseBlock *corecfg.BasicBlock
 	mergeBlock := b.newBlock("if_merge")
 
 	// Connect current to then (true branch)
-	b.cfg.ConnectBlocks(b.currentBlock, thenBlock, EdgeCondTrue)
+	b.cfg.ConnectBlocks(b.currentBlock, thenBlock, corecfg.EdgeCondTrue)
 
 	// Process then branch
 	b.currentBlock = thenBlock
@@ -330,7 +335,7 @@ func (b *CFGBuilder) buildIfStatement(node *parser.Node) {
 
 	// Connect then block to merge if it doesn't end with return/break/continue/throw
 	if b.currentBlock != nil && !b.endsWithJump(b.currentBlock) {
-		b.cfg.ConnectBlocks(b.currentBlock, mergeBlock, EdgeNormal)
+		b.cfg.ConnectBlocks(b.currentBlock, mergeBlock, corecfg.EdgeNormal)
 	}
 
 	// Process else branch if exists
@@ -348,7 +353,7 @@ func (b *CFGBuilder) buildIfStatement(node *parser.Node) {
 
 		// Connect else block to merge if it doesn't end with jump
 		if b.currentBlock != nil && !b.endsWithJump(b.currentBlock) {
-			b.cfg.ConnectBlocks(b.currentBlock, mergeBlock, EdgeNormal)
+			b.cfg.ConnectBlocks(b.currentBlock, mergeBlock, corecfg.EdgeNormal)
 		}
 	}
 
@@ -357,8 +362,8 @@ func (b *CFGBuilder) buildIfStatement(node *parser.Node) {
 		// Find the block before thenBlock (which has the test)
 		for _, block := range b.cfg.Blocks {
 			for _, edge := range block.Successors {
-				if edge.To == thenBlock && edge.Type == EdgeCondTrue {
-					b.cfg.ConnectBlocks(block, elseBlock, EdgeCondFalse)
+				if edge.To == thenBlock && edge.Type == corecfg.EdgeCondTrue {
+					b.cfg.ConnectBlocks(block, elseBlock, corecfg.EdgeCondFalse)
 					break
 				}
 			}
@@ -367,8 +372,8 @@ func (b *CFGBuilder) buildIfStatement(node *parser.Node) {
 		// No else - connect directly to merge
 		for _, block := range b.cfg.Blocks {
 			for _, edge := range block.Successors {
-				if edge.To == thenBlock && edge.Type == EdgeCondTrue {
-					b.cfg.ConnectBlocks(block, mergeBlock, EdgeCondFalse)
+				if edge.To == thenBlock && edge.Type == corecfg.EdgeCondTrue {
+					b.cfg.ConnectBlocks(block, mergeBlock, corecfg.EdgeCondFalse)
 					break
 				}
 			}
@@ -387,8 +392,8 @@ func (b *CFGBuilder) buildSwitchStatement(node *parser.Node) {
 
 	testBlock := b.currentBlock
 	mergeBlock := b.newBlock(LabelSwitchMerge)
-	var prevCaseBlock *BasicBlock
-	var defaultBlock *BasicBlock
+	var prevCaseBlock *corecfg.BasicBlock
+	var defaultBlock *corecfg.BasicBlock
 
 	// Process each case
 	for i, caseNode := range node.Cases {
@@ -398,7 +403,7 @@ func (b *CFGBuilder) buildSwitchStatement(node *parser.Node) {
 		if caseNode.Type == parser.NodeDefaultClause {
 			defaultBlock = caseBlock
 		} else {
-			b.cfg.ConnectBlocks(testBlock, caseBlock, EdgeCondTrue)
+			b.cfg.ConnectBlocks(testBlock, caseBlock, corecfg.EdgeCondTrue)
 		}
 
 		b.currentBlock = caseBlock
@@ -423,7 +428,7 @@ func (b *CFGBuilder) buildSwitchStatement(node *parser.Node) {
 		if hasBreak || b.endsWithJump(b.currentBlock) {
 			// Case ends with break/return - connect to merge
 			if b.currentBlock != nil {
-				b.cfg.ConnectBlocks(b.currentBlock, mergeBlock, EdgeBreak)
+				b.cfg.ConnectBlocks(b.currentBlock, mergeBlock, corecfg.EdgeBreak)
 			}
 		} else if i < len(node.Cases)-1 {
 			// Fall-through to next case
@@ -431,22 +436,22 @@ func (b *CFGBuilder) buildSwitchStatement(node *parser.Node) {
 		} else {
 			// Last case without break
 			if b.currentBlock != nil {
-				b.cfg.ConnectBlocks(b.currentBlock, mergeBlock, EdgeNormal)
+				b.cfg.ConnectBlocks(b.currentBlock, mergeBlock, corecfg.EdgeNormal)
 			}
 		}
 
 		// Connect previous case (fall-through)
 		if prevCaseBlock != nil && prevCaseBlock != caseBlock {
-			b.cfg.ConnectBlocks(prevCaseBlock, caseBlock, EdgeNormal)
+			b.cfg.ConnectBlocks(prevCaseBlock, caseBlock, corecfg.EdgeNormal)
 			prevCaseBlock = nil
 		}
 	}
 
 	// Connect test block to default or merge
 	if defaultBlock != nil {
-		b.cfg.ConnectBlocks(testBlock, defaultBlock, EdgeCondFalse)
+		b.cfg.ConnectBlocks(testBlock, defaultBlock, corecfg.EdgeCondFalse)
 	} else {
-		b.cfg.ConnectBlocks(testBlock, mergeBlock, EdgeCondFalse)
+		b.cfg.ConnectBlocks(testBlock, mergeBlock, corecfg.EdgeCondFalse)
 	}
 
 	b.currentBlock = mergeBlock
@@ -465,7 +470,7 @@ func (b *CFGBuilder) buildForStatement(node *parser.Node) {
 	exitBlock := b.newBlock(LabelLoopExit)
 
 	// Connect current to header
-	b.cfg.ConnectBlocks(b.currentBlock, headerBlock, EdgeNormal)
+	b.cfg.ConnectBlocks(b.currentBlock, headerBlock, corecfg.EdgeNormal)
 
 	// Add test to header block
 	if node.Test != nil {
@@ -473,8 +478,8 @@ func (b *CFGBuilder) buildForStatement(node *parser.Node) {
 	}
 
 	// Connect header to body (true) and exit (false)
-	b.cfg.ConnectBlocks(headerBlock, bodyBlock, EdgeCondTrue)
-	b.cfg.ConnectBlocks(headerBlock, exitBlock, EdgeCondFalse)
+	b.cfg.ConnectBlocks(headerBlock, bodyBlock, corecfg.EdgeCondTrue)
+	b.cfg.ConnectBlocks(headerBlock, exitBlock, corecfg.EdgeCondFalse)
 
 	// Push loop context for break/continue
 	b.loopStack = append(b.loopStack, &loopContext{
@@ -497,7 +502,7 @@ func (b *CFGBuilder) buildForStatement(node *parser.Node) {
 		if node.Update != nil {
 			b.currentBlock.Statements = append(b.currentBlock.Statements, node.Update)
 		}
-		b.cfg.ConnectBlocks(b.currentBlock, headerBlock, EdgeLoop)
+		b.cfg.ConnectBlocks(b.currentBlock, headerBlock, corecfg.EdgeLoop)
 	}
 
 	// Pop loop context
@@ -519,11 +524,11 @@ func (b *CFGBuilder) buildForInStatement(node *parser.Node) {
 	exitBlock := b.newBlock(LabelLoopExit)
 
 	// Connect current to header
-	b.cfg.ConnectBlocks(b.currentBlock, headerBlock, EdgeNormal)
+	b.cfg.ConnectBlocks(b.currentBlock, headerBlock, corecfg.EdgeNormal)
 
 	// Connect header to body and exit
-	b.cfg.ConnectBlocks(headerBlock, bodyBlock, EdgeCondTrue)
-	b.cfg.ConnectBlocks(headerBlock, exitBlock, EdgeCondFalse)
+	b.cfg.ConnectBlocks(headerBlock, bodyBlock, corecfg.EdgeCondTrue)
+	b.cfg.ConnectBlocks(headerBlock, exitBlock, corecfg.EdgeCondFalse)
 
 	// Push loop context
 	b.loopStack = append(b.loopStack, &loopContext{
@@ -543,7 +548,7 @@ func (b *CFGBuilder) buildForInStatement(node *parser.Node) {
 
 	// Connect back to header
 	if b.currentBlock != nil && !b.endsWithJump(b.currentBlock) {
-		b.cfg.ConnectBlocks(b.currentBlock, headerBlock, EdgeLoop)
+		b.cfg.ConnectBlocks(b.currentBlock, headerBlock, corecfg.EdgeLoop)
 	}
 
 	// Pop loop context
@@ -566,7 +571,7 @@ func (b *CFGBuilder) buildWhileStatement(node *parser.Node) {
 	exitBlock := b.newBlock(LabelLoopExit)
 
 	// Connect current to header
-	b.cfg.ConnectBlocks(b.currentBlock, headerBlock, EdgeNormal)
+	b.cfg.ConnectBlocks(b.currentBlock, headerBlock, corecfg.EdgeNormal)
 
 	// Add test to header
 	if node.Test != nil {
@@ -574,8 +579,8 @@ func (b *CFGBuilder) buildWhileStatement(node *parser.Node) {
 	}
 
 	// Connect header to body and exit
-	b.cfg.ConnectBlocks(headerBlock, bodyBlock, EdgeCondTrue)
-	b.cfg.ConnectBlocks(headerBlock, exitBlock, EdgeCondFalse)
+	b.cfg.ConnectBlocks(headerBlock, bodyBlock, corecfg.EdgeCondTrue)
+	b.cfg.ConnectBlocks(headerBlock, exitBlock, corecfg.EdgeCondFalse)
 
 	// Push loop context
 	b.loopStack = append(b.loopStack, &loopContext{
@@ -595,7 +600,7 @@ func (b *CFGBuilder) buildWhileStatement(node *parser.Node) {
 
 	// Connect back to header
 	if b.currentBlock != nil && !b.endsWithJump(b.currentBlock) {
-		b.cfg.ConnectBlocks(b.currentBlock, headerBlock, EdgeLoop)
+		b.cfg.ConnectBlocks(b.currentBlock, headerBlock, corecfg.EdgeLoop)
 	}
 
 	// Pop loop context
@@ -612,7 +617,7 @@ func (b *CFGBuilder) buildDoWhileStatement(node *parser.Node) {
 	exitBlock := b.newBlock(LabelLoopExit)
 
 	// Connect current to body (do-while always executes once)
-	b.cfg.ConnectBlocks(b.currentBlock, bodyBlock, EdgeNormal)
+	b.cfg.ConnectBlocks(b.currentBlock, bodyBlock, corecfg.EdgeNormal)
 
 	// Push loop context
 	b.loopStack = append(b.loopStack, &loopContext{
@@ -632,7 +637,7 @@ func (b *CFGBuilder) buildDoWhileStatement(node *parser.Node) {
 
 	// Connect body to header (test)
 	if b.currentBlock != nil && !b.endsWithJump(b.currentBlock) {
-		b.cfg.ConnectBlocks(b.currentBlock, headerBlock, EdgeNormal)
+		b.cfg.ConnectBlocks(b.currentBlock, headerBlock, corecfg.EdgeNormal)
 	}
 
 	// Add test to header
@@ -641,8 +646,8 @@ func (b *CFGBuilder) buildDoWhileStatement(node *parser.Node) {
 	}
 
 	// Connect header back to body (true) or to exit (false)
-	b.cfg.ConnectBlocks(headerBlock, bodyBlock, EdgeCondTrue)
-	b.cfg.ConnectBlocks(headerBlock, exitBlock, EdgeCondFalse)
+	b.cfg.ConnectBlocks(headerBlock, bodyBlock, corecfg.EdgeCondTrue)
+	b.cfg.ConnectBlocks(headerBlock, exitBlock, corecfg.EdgeCondFalse)
 
 	// Pop loop context
 	b.loopStack = b.loopStack[:len(b.loopStack)-1]
@@ -653,12 +658,12 @@ func (b *CFGBuilder) buildDoWhileStatement(node *parser.Node) {
 // buildTryStatement builds CFG for try-catch-finally
 func (b *CFGBuilder) buildTryStatement(node *parser.Node) {
 	tryBlock := b.newBlock(LabelTryBlock)
-	var catchBlock *BasicBlock
-	var finallyBlock *BasicBlock
+	var catchBlock *corecfg.BasicBlock
+	var finallyBlock *corecfg.BasicBlock
 	mergeBlock := b.newBlock("try_merge")
 
 	// Connect current to try block
-	b.cfg.ConnectBlocks(b.currentBlock, tryBlock, EdgeNormal)
+	b.cfg.ConnectBlocks(b.currentBlock, tryBlock, corecfg.EdgeNormal)
 
 	// Process try block
 	b.currentBlock = tryBlock
@@ -686,7 +691,7 @@ func (b *CFGBuilder) buildTryStatement(node *parser.Node) {
 		}
 
 		// Connect try block to catch with exception edge
-		b.cfg.ConnectBlocks(tryBlock, catchBlock, EdgeException)
+		b.cfg.ConnectBlocks(tryBlock, catchBlock, corecfg.EdgeException)
 	}
 
 	// Process finally block if exists
@@ -694,25 +699,27 @@ func (b *CFGBuilder) buildTryStatement(node *parser.Node) {
 		finallyBlock = b.newBlock(LabelFinallyBlock)
 
 		// Add finally statements
-		finallyBlock.Statements = append(finallyBlock.Statements, node.Finalizer.Body...)
+		for _, bodyNode := range node.Finalizer.Body {
+			finallyBlock.Statements = append(finallyBlock.Statements, bodyNode)
+		}
 
 		// Connect try and catch to finally
 		if tryEndBlock != nil && !b.endsWithJump(tryEndBlock) {
-			b.cfg.ConnectBlocks(tryEndBlock, finallyBlock, EdgeNormal)
+			b.cfg.ConnectBlocks(tryEndBlock, finallyBlock, corecfg.EdgeNormal)
 		}
 		if catchBlock != nil && b.currentBlock != nil && !b.endsWithJump(b.currentBlock) {
-			b.cfg.ConnectBlocks(b.currentBlock, finallyBlock, EdgeNormal)
+			b.cfg.ConnectBlocks(b.currentBlock, finallyBlock, corecfg.EdgeNormal)
 		}
 
 		// Finally connects to merge
-		b.cfg.ConnectBlocks(finallyBlock, mergeBlock, EdgeNormal)
+		b.cfg.ConnectBlocks(finallyBlock, mergeBlock, corecfg.EdgeNormal)
 	} else {
 		// No finally - connect try and catch directly to merge
 		if tryEndBlock != nil && !b.endsWithJump(tryEndBlock) {
-			b.cfg.ConnectBlocks(tryEndBlock, mergeBlock, EdgeNormal)
+			b.cfg.ConnectBlocks(tryEndBlock, mergeBlock, corecfg.EdgeNormal)
 		}
 		if catchBlock != nil && b.currentBlock != nil && !b.endsWithJump(b.currentBlock) {
-			b.cfg.ConnectBlocks(b.currentBlock, mergeBlock, EdgeNormal)
+			b.cfg.ConnectBlocks(b.currentBlock, mergeBlock, corecfg.EdgeNormal)
 		}
 	}
 
@@ -725,7 +732,7 @@ func (b *CFGBuilder) buildReturnStatement(node *parser.Node) {
 	b.currentBlock.Statements = append(b.currentBlock.Statements, node)
 
 	// Connect to exit
-	b.cfg.ConnectBlocks(b.currentBlock, b.cfg.Exit, EdgeReturn)
+	b.cfg.ConnectBlocks(b.currentBlock, b.cfg.Exit, corecfg.EdgeReturn)
 
 	// Create unreachable block for code after return
 	b.currentBlock = b.newBlock(LabelUnreachable)
@@ -739,7 +746,7 @@ func (b *CFGBuilder) buildBreakStatement(node *parser.Node) {
 	// Connect to loop exit if in a loop
 	if len(b.loopStack) > 0 {
 		loopCtx := b.loopStack[len(b.loopStack)-1]
-		b.cfg.ConnectBlocks(b.currentBlock, loopCtx.exitBlock, EdgeBreak)
+		b.cfg.ConnectBlocks(b.currentBlock, loopCtx.exitBlock, corecfg.EdgeBreak)
 	}
 
 	// Create unreachable block for code after break
@@ -754,7 +761,7 @@ func (b *CFGBuilder) buildContinueStatement(node *parser.Node) {
 	// Connect to loop header if in a loop
 	if len(b.loopStack) > 0 {
 		loopCtx := b.loopStack[len(b.loopStack)-1]
-		b.cfg.ConnectBlocks(b.currentBlock, loopCtx.headerBlock, EdgeContinue)
+		b.cfg.ConnectBlocks(b.currentBlock, loopCtx.headerBlock, corecfg.EdgeContinue)
 	}
 
 	// Create unreachable block for code after continue
@@ -770,14 +777,14 @@ func (b *CFGBuilder) buildThrowStatement(node *parser.Node) {
 	if len(b.exceptionStack) > 0 {
 		excCtx := b.exceptionStack[len(b.exceptionStack)-1]
 		if excCtx.catchBlock != nil {
-			b.cfg.ConnectBlocks(b.currentBlock, excCtx.catchBlock, EdgeException)
+			b.cfg.ConnectBlocks(b.currentBlock, excCtx.catchBlock, corecfg.EdgeException)
 		} else if excCtx.finallyBlock != nil {
-			b.cfg.ConnectBlocks(b.currentBlock, excCtx.finallyBlock, EdgeException)
+			b.cfg.ConnectBlocks(b.currentBlock, excCtx.finallyBlock, corecfg.EdgeException)
 		} else {
-			b.cfg.ConnectBlocks(b.currentBlock, b.cfg.Exit, EdgeException)
+			b.cfg.ConnectBlocks(b.currentBlock, b.cfg.Exit, corecfg.EdgeException)
 		}
 	} else {
-		b.cfg.ConnectBlocks(b.currentBlock, b.cfg.Exit, EdgeException)
+		b.cfg.ConnectBlocks(b.currentBlock, b.cfg.Exit, corecfg.EdgeException)
 	}
 
 	// Create unreachable block for code after throw
@@ -798,16 +805,16 @@ func (b *CFGBuilder) buildBlockStatement(node *parser.Node) {
 // Helper methods
 
 // newBlock creates a new basic block with a unique ID
-func (b *CFGBuilder) newBlock(label string) *BasicBlock {
+func (b *CFGBuilder) newBlock(label string) *corecfg.BasicBlock {
 	b.blockCounter++
 	blockID := label + "_" + strconv.Itoa(int(b.blockCounter))
-	block := NewBasicBlock(blockID)
+	block := corecfg.NewBasicBlock(blockID)
 	b.cfg.Blocks[blockID] = block
 	return block
 }
 
 // hasSuccessor checks if block has a successor
-func (b *CFGBuilder) hasSuccessor(block *BasicBlock, target *BasicBlock) bool {
+func (b *CFGBuilder) hasSuccessor(block *corecfg.BasicBlock, target *corecfg.BasicBlock) bool {
 	for _, edge := range block.Successors {
 		if edge.To == target {
 			return true
@@ -817,12 +824,14 @@ func (b *CFGBuilder) hasSuccessor(block *BasicBlock, target *BasicBlock) bool {
 }
 
 // endsWithJump checks if a block ends with a jump statement (return, break, continue, throw)
-func (b *CFGBuilder) endsWithJump(block *BasicBlock) bool {
+func (b *CFGBuilder) endsWithJump(block *corecfg.BasicBlock) bool {
 	if len(block.Statements) == 0 {
 		return false
 	}
-
-	lastStmt := block.Statements[len(block.Statements)-1]
+	lastStmt, ok := block.Statements[len(block.Statements)-1].(*parser.Node)
+	if !ok || lastStmt == nil {
+		return false
+	}
 	return lastStmt.Type == parser.NodeReturnStatement ||
 		lastStmt.Type == parser.NodeBreakStatement ||
 		lastStmt.Type == parser.NodeContinueStatement ||

@@ -3,6 +3,7 @@ package analyzer
 import (
 	"testing"
 
+	corecfg "github.com/ludo-technologies/codescan-core/cfg"
 	"github.com/ludo-technologies/jscan/internal/config"
 	"github.com/ludo-technologies/jscan/internal/parser"
 )
@@ -365,5 +366,5 @@ func BenchmarkCFGTraversal_BreadthFirst(b *testing.B) {
 
 type noOpVisitor struct{}
 
-func (v *noOpVisitor) VisitBlock(block *BasicBlock) bool { return true }
-func (v *noOpVisitor) VisitEdge(edge *Edge) bool         { return true }
+func (v *noOpVisitor) VisitBlock(block *corecfg.BasicBlock) bool { return true }
+func (v *noOpVisitor) VisitEdge(edge *corecfg.Edge) bool         { return true }
