@@ -5,11 +5,13 @@
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Status](https://img.shields.io/badge/Status-Active_Development-brightgreen.svg)](https://github.com/ludo-technologies/jscan)
 
-## jscan is a code quality analyzer for JavaScript/TypeScript vibe coders.
-
 Building with Cursor, Claude, or ChatGPT? jscan performs structural analysis to keep your codebase maintainable.
 
-Sister project: [pyscn](https://github.com/ludo-technologies/pyscn) - Python Code Quality Analyzer
+
+## Demo
+
+https://github.com/user-attachments/assets/6c491b52-99d3-4fa4-b628-e09c0b61451d
+
 
 ## Features
 
