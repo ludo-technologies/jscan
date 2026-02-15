@@ -2,6 +2,7 @@ package analyzer
 
 import (
 	"context"
+	"math"
 	"testing"
 
 	"github.com/ludo-technologies/jscan/domain"
@@ -418,5 +419,44 @@ func TestHelperFunctions(t *testing.T) {
 	}
 	if minInt(5, 3) != 3 {
 		t.Error("minInt(5, 3) should be 3")
+	}
+}
+
+func TestSimilarityFromDistance_MatchesAnalyzerFormula(t *testing.T) {
+	analyzer := NewAPTEDAnalyzer(NewJavaScriptCostModel())
+
+	treeA := &TreeNode{
+		Label: "FunctionDeclaration",
+		Children: []*TreeNode{
+			{Label: "Identifier"},
+			{
+				Label: "BlockStatement",
+				Children: []*TreeNode{
+					{Label: "ReturnStatement"},
+				},
+			},
+		},
+	}
+	treeB := &TreeNode{
+		Label: "FunctionDeclaration",
+		Children: []*TreeNode{
+			{Label: "Identifier"},
+			{
+				Label: "BlockStatement",
+				Children: []*TreeNode{
+					{Label: "ExpressionStatement"},
+				},
+			},
+		},
+	}
+	PrepareTreeForAPTED(treeA)
+	PrepareTreeForAPTED(treeB)
+
+	distance := analyzer.ComputeDistance(treeA, treeB)
+	got := similarityFromDistance(distance, treeA, treeB)
+	want := analyzer.ComputeSimilarity(treeA, treeB)
+
+	if math.Abs(got-want) > 1e-12 {
+		t.Fatalf("similarity mismatch: got %.12f, want %.12f", got, want)
 	}
 }

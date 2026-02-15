@@ -702,7 +702,7 @@ func (cd *CloneDetector) compareFragments(fragment1, fragment2 *CodeFragment, pa
 
 	// Compute edit distance and similarity using APTED algorithm
 	distance := cd.analyzer.ComputeDistance(fragment1.TreeNode, fragment2.TreeNode)
-	similarity := cd.analyzer.ComputeSimilarity(fragment1.TreeNode, fragment2.TreeNode)
+	similarity := similarityFromDistance(distance, fragment1.TreeNode, fragment2.TreeNode)
 
 	// Determine clone type based on similarity
 	cloneType := cd.classifyCloneType(similarity, distance)
@@ -726,6 +726,29 @@ func (cd *CloneDetector) compareFragments(fragment1, fragment2 *CodeFragment, pa
 		Type:       cloneType,
 		Confidence: confidence,
 	}
+}
+
+// similarityFromDistance computes similarity from an already computed distance.
+// This avoids recomputing APTED distance and mirrors APTEDAnalyzer.ComputeSimilarity.
+func similarityFromDistance(distance float64, tree1, tree2 *TreeNode) float64 {
+	if tree1 == nil && tree2 == nil {
+		return 1.0
+	}
+	if tree1 == nil || tree2 == nil {
+		return 0.0
+	}
+
+	size1 := float64(tree1.Size())
+	size2 := float64(tree2.Size())
+	maxPossibleDistance := size1 + size2
+	if maxPossibleDistance == 0 {
+		return 1.0
+	}
+
+	normalizedDistance := math.Min(distance, maxPossibleDistance) / maxPossibleDistance
+	similarity := 1.0 - normalizedDistance
+
+	return math.Max(0.0, math.Min(1.0, similarity))
 }
 
 // fragmentToClone converts a CodeFragment to a domain.Clone

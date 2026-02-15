@@ -346,7 +346,7 @@ func DefaultCloneRequest() *CloneRequest {
 		CloneTypes:          []CloneType{Type1Clone, Type2Clone, Type3Clone, Type4Clone},
 		// LSH defaults (auto-enable based on fragment count)
 		LSHEnabled:             "auto",
-		LSHAutoThreshold:       500,
+		LSHAutoThreshold:       200,
 		LSHSimilarityThreshold: 0.50,
 		LSHBands:               32,
 		LSHRows:                4,
@@ -373,7 +373,7 @@ func ShouldUseLSH(lshEnabled string, fragmentCount int, autoThreshold int) bool 
 	// Auto mode (default) or empty string
 	threshold := autoThreshold
 	if threshold == 0 {
-		threshold = 500 // Default threshold
+		threshold = 200 // Default threshold
 	}
 	return fragmentCount >= threshold
 }
