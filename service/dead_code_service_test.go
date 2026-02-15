@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/ludo-technologies/jscan/domain"
@@ -50,6 +51,9 @@ function noDeadCode() {
 	if response.Summary.TotalFiles != 1 {
 		t.Errorf("Expected 1 file processed, got %d", response.Summary.TotalFiles)
 	}
+	if response.Summary.FilesWithDeadCode != 1 {
+		t.Errorf("Expected FilesWithDeadCode to be 1, got %d", response.Summary.FilesWithDeadCode)
+	}
 }
 
 func TestDeadCodeServiceAnalyzeFile(t *testing.T) {
@@ -86,6 +90,204 @@ function example() {
 
 	if result.FilePath != testFile {
 		t.Errorf("Expected file path %s, got %s", testFile, result.FilePath)
+	}
+}
+
+func TestDeadCodeServiceAnalyze_ContextCancelled(t *testing.T) {
+	tempDir := t.TempDir()
+	testFile := filepath.Join(tempDir, "test.js")
+	content := `
+function hasDeadCode() {
+    return 1;
+    console.log("never");
+}
+`
+	if err := os.WriteFile(testFile, []byte(content), 0644); err != nil {
+		t.Fatalf("Failed to create test file: %v", err)
+	}
+
+	svc := NewDeadCodeService()
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	req := domain.DeadCodeRequest{
+		Paths:       []string{testFile},
+		MinSeverity: domain.DeadCodeSeverityInfo,
+		SortBy:      domain.DeadCodeSortBySeverity,
+	}
+
+	_, err := svc.Analyze(ctx, req)
+	if err == nil {
+		t.Fatal("Expected cancellation error")
+	}
+	if !strings.Contains(err.Error(), "cancelled") {
+		t.Fatalf("Expected cancelled error, got: %v", err)
+	}
+}
+
+func TestDeadCodeServiceAnalyze_NoFunctionModuleIncludesFileLevelFindings(t *testing.T) {
+	tempDir := t.TempDir()
+	moduleFile := filepath.Join(tempDir, "module.js")
+	depFile := filepath.Join(tempDir, "dep.js")
+
+	moduleContent := `
+import dep from "./dep.js";
+export const answer = 42;
+`
+	depContent := `export default 1;`
+
+	if err := os.WriteFile(moduleFile, []byte(moduleContent), 0644); err != nil {
+		t.Fatalf("Failed to create module file: %v", err)
+	}
+	if err := os.WriteFile(depFile, []byte(depContent), 0644); err != nil {
+		t.Fatalf("Failed to create dep file: %v", err)
+	}
+
+	svc := NewDeadCodeService()
+	req := domain.DeadCodeRequest{
+		Paths:       []string{moduleFile, depFile},
+		MinSeverity: domain.DeadCodeSeverityInfo,
+		SortBy:      domain.DeadCodeSortBySeverity,
+	}
+
+	resp, err := svc.Analyze(context.Background(), req)
+	if err != nil {
+		t.Fatalf("Analyze failed: %v", err)
+	}
+
+	var moduleResult *domain.FileDeadCode
+	for i := range resp.Files {
+		if resp.Files[i].FilePath == moduleFile {
+			moduleResult = &resp.Files[i]
+			break
+		}
+	}
+
+	if moduleResult == nil {
+		t.Fatalf("Expected result entry for %s", moduleFile)
+	}
+	if len(moduleResult.FileLevelFindings) == 0 {
+		t.Fatalf("Expected file-level findings for module with no functions")
+	}
+	if resp.Summary.TotalFindings == 0 {
+		t.Fatalf("Expected non-zero summary findings")
+	}
+}
+
+func TestDeadCodeServiceAnalyze_SummaryMatchesFileTotalsWithUnusedImports(t *testing.T) {
+	tempDir := t.TempDir()
+	moduleFile := filepath.Join(tempDir, "module.js")
+	depFile := filepath.Join(tempDir, "dep.js")
+
+	moduleContent := `
+import dep from "./dep.js";
+export const answer = 42;
+`
+	depContent := `export default 1;`
+
+	if err := os.WriteFile(moduleFile, []byte(moduleContent), 0644); err != nil {
+		t.Fatalf("Failed to create module file: %v", err)
+	}
+	if err := os.WriteFile(depFile, []byte(depContent), 0644); err != nil {
+		t.Fatalf("Failed to create dep file: %v", err)
+	}
+
+	svc := NewDeadCodeService()
+	req := domain.DeadCodeRequest{
+		Paths:       []string{moduleFile, depFile},
+		MinSeverity: domain.DeadCodeSeverityInfo,
+		SortBy:      domain.DeadCodeSortBySeverity,
+	}
+
+	resp, err := svc.Analyze(context.Background(), req)
+	if err != nil {
+		t.Fatalf("Analyze failed: %v", err)
+	}
+
+	totalFindingsFromFiles := 0
+	critical := 0
+	warning := 0
+	info := 0
+	for _, file := range resp.Files {
+		totalFindingsFromFiles += file.TotalFindings
+		for _, fn := range file.Functions {
+			for _, finding := range fn.Findings {
+				switch finding.Severity {
+				case domain.DeadCodeSeverityCritical:
+					critical++
+				case domain.DeadCodeSeverityWarning:
+					warning++
+				case domain.DeadCodeSeverityInfo:
+					info++
+				}
+			}
+		}
+		for _, finding := range file.FileLevelFindings {
+			switch finding.Severity {
+			case domain.DeadCodeSeverityCritical:
+				critical++
+			case domain.DeadCodeSeverityWarning:
+				warning++
+			case domain.DeadCodeSeverityInfo:
+				info++
+			}
+		}
+	}
+
+	if resp.Summary.TotalFindings != totalFindingsFromFiles {
+		t.Fatalf("Summary.TotalFindings=%d, file total=%d", resp.Summary.TotalFindings, totalFindingsFromFiles)
+	}
+	if resp.Summary.CriticalFindings != critical {
+		t.Fatalf("Summary.CriticalFindings=%d, computed=%d", resp.Summary.CriticalFindings, critical)
+	}
+	if resp.Summary.WarningFindings != warning {
+		t.Fatalf("Summary.WarningFindings=%d, computed=%d", resp.Summary.WarningFindings, warning)
+	}
+	if resp.Summary.InfoFindings != info {
+		t.Fatalf("Summary.InfoFindings=%d, computed=%d", resp.Summary.InfoFindings, info)
+	}
+}
+
+func TestDeadCodeServiceAnalyze_CrossFileOnlyFindingPreservesFunctionMetrics(t *testing.T) {
+	tempDir := t.TempDir()
+	moduleFile := filepath.Join(tempDir, "module.js")
+	moduleContent := `
+export function alive() {
+  return 42;
+}
+`
+	if err := os.WriteFile(moduleFile, []byte(moduleContent), 0644); err != nil {
+		t.Fatalf("Failed to create module file: %v", err)
+	}
+
+	svc := NewDeadCodeService()
+	req := domain.DeadCodeRequest{
+		Paths:       []string{moduleFile},
+		MinSeverity: domain.DeadCodeSeverityInfo,
+		SortBy:      domain.DeadCodeSortBySeverity,
+	}
+
+	resp, err := svc.Analyze(context.Background(), req)
+	if err != nil {
+		t.Fatalf("Analyze failed: %v", err)
+	}
+
+	if len(resp.Files) != 1 {
+		t.Fatalf("Expected exactly one file result, got %d", len(resp.Files))
+	}
+
+	file := resp.Files[0]
+	if file.TotalFunctions != 1 {
+		t.Fatalf("Expected TotalFunctions=1, got %d", file.TotalFunctions)
+	}
+	if file.AffectedFunctions != 0 {
+		t.Fatalf("Expected AffectedFunctions=0, got %d", file.AffectedFunctions)
+	}
+	if file.DeadCodeRatio != 0 {
+		t.Fatalf("Expected DeadCodeRatio=0, got %f", file.DeadCodeRatio)
+	}
+	if len(file.FileLevelFindings) == 0 {
+		t.Fatal("Expected cross-file file-level findings")
 	}
 }
 

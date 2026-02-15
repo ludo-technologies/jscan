@@ -138,11 +138,14 @@ See `jscan.config.example.json` for all available options.
 
 ## Architecture
 
-jscan follows Clean Architecture principles with five distinct layers:
+jscan uses a layered architecture inspired by Clean Architecture:
 
 ```
-CLI (cmd/) -> Application (app/) -> Service (service/) -> Internal (internal/) -> Domain (domain/)
+cmd -> service -> internal -> domain
+cmd -> app -> service -> internal -> domain
 ```
+
+The `domain` package stays dependency-free and is shared across all layers.
 
 See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the full design documentation.
 

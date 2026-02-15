@@ -10,10 +10,7 @@ import (
 
 	"github.com/ludo-technologies/jscan/app"
 	"github.com/ludo-technologies/jscan/domain"
-	"github.com/ludo-technologies/jscan/internal/analyzer"
 	"github.com/ludo-technologies/jscan/internal/config"
-	"github.com/ludo-technologies/jscan/internal/parser"
-	"github.com/ludo-technologies/jscan/internal/version"
 	"github.com/ludo-technologies/jscan/service"
 	"github.com/spf13/cobra"
 )
@@ -311,268 +308,24 @@ func runDeadCodeAnalysis(files []string, _ *config.Config, pm domain.ProgressMan
 	task := pm.StartTask("Detecting dead code", len(files))
 	defer task.Complete()
 
-	return runDeadCodeAnalysisWithTask(files, task)
+	req := domain.DeadCodeRequest{
+		Paths:       files,
+		MinSeverity: domain.DeadCodeSeverityInfo,
+		SortBy:      domain.DeadCodeSortBySeverity,
+	}
+
+	return service.AnalyzeDeadCodeWithTask(context.Background(), req, task)
 }
 
 // runDeadCodeAnalysisInternal runs dead code analysis on the given files without progress tracking
 func runDeadCodeAnalysisInternal(files []string) (*domain.DeadCodeResponse, error) {
-	return runDeadCodeAnalysisWithTask(files, nil)
-}
-
-// runDeadCodeAnalysisWithTask runs dead code analysis with optional task progress
-func runDeadCodeAnalysisWithTask(files []string, task domain.TaskProgress) (*domain.DeadCodeResponse, error) {
-	var allFiles []domain.FileDeadCode
-	var totalFindings, criticalFindings, warningFindings, infoFindings int
-	var totalFunctions, functionsWithDeadCode int
-
-	// Track module info and ASTs for cross-file unused export detection
-	allModuleInfos := make(map[string]*domain.ModuleInfo)
-	analyzedFiles := make(map[string]bool)
-	// Map filePath → index in allFiles for merging file-level findings later
-	fileIndexMap := make(map[string]int)
-
-	moduleAnalyzer := analyzer.NewModuleAnalyzer(nil)
-
-	for _, filePath := range files {
-		analyzedFiles[filePath] = true
-
-		// Read file
-		content, err := os.ReadFile(filePath)
-		if err != nil {
-			continue
-		}
-
-		// Parse file
-		ast, err := parser.ParseForLanguage(filePath, content)
-		if err != nil {
-			continue
-		}
-
-		// Build CFGs for all functions
-		builder := analyzer.NewCFGBuilder()
-		cfgs, err := builder.BuildAll(ast)
-		if err != nil {
-			continue
-		}
-
-		// Detect dead code (CFG-based)
-		results := analyzer.DetectAll(cfgs, filePath)
-
-		// Analyze module imports/exports
-		moduleInfo, moduleErr := moduleAnalyzer.AnalyzeFile(ast, filePath)
-		if moduleErr == nil && moduleInfo != nil {
-			allModuleInfos[filePath] = moduleInfo
-		}
-
-		// Detect unused imports (per-file)
-		var fileLevelFindings []domain.DeadCodeFinding
-		if moduleInfo != nil {
-			unusedImports := analyzer.DetectUnusedImports(ast, moduleInfo, filePath)
-			for _, finding := range unusedImports {
-				f := domain.DeadCodeFinding{
-					Location: domain.DeadCodeLocation{
-						FilePath:  filePath,
-						StartLine: finding.StartLine,
-						EndLine:   finding.EndLine,
-					},
-					Reason:      string(finding.Reason),
-					Severity:    domain.DeadCodeSeverity(finding.Severity),
-					Description: finding.Description,
-				}
-				fileLevelFindings = append(fileLevelFindings, f)
-				warningFindings++
-				totalFindings++
-			}
-		}
-
-		// Convert CFG-based results to domain model
-		var functions []domain.FunctionDeadCode
-		for funcName, result := range results {
-			if funcName == "__main__" {
-				continue
-			}
-
-			totalFunctions++
-
-			var findings []domain.DeadCodeFinding
-			for _, finding := range result.Findings {
-				f := domain.DeadCodeFinding{
-					Location: domain.DeadCodeLocation{
-						FilePath:  filePath,
-						StartLine: finding.StartLine,
-						EndLine:   finding.EndLine,
-					},
-					FunctionName: funcName,
-					Reason:       string(finding.Reason),
-					Severity:     domain.DeadCodeSeverity(finding.Severity),
-					Description:  finding.Description,
-				}
-				findings = append(findings, f)
-
-				// Count by severity
-				switch f.Severity {
-				case domain.DeadCodeSeverityCritical:
-					criticalFindings++
-				case domain.DeadCodeSeverityWarning:
-					warningFindings++
-				case domain.DeadCodeSeverityInfo:
-					infoFindings++
-				}
-				totalFindings++
-			}
-
-			if len(findings) > 0 {
-				functionsWithDeadCode++
-				fn := domain.FunctionDeadCode{
-					Name:     funcName,
-					FilePath: filePath,
-					Findings: findings,
-				}
-				fn.CalculateSeverityCounts()
-				functions = append(functions, fn)
-			}
-		}
-
-		if len(functions) > 0 || len(fileLevelFindings) > 0 {
-			findingsCount := len(fileLevelFindings)
-			for _, fn := range functions {
-				findingsCount += len(fn.Findings)
-			}
-			fileDeadCode := domain.FileDeadCode{
-				FilePath:          filePath,
-				Functions:         functions,
-				FileLevelFindings: fileLevelFindings,
-				TotalFindings:     findingsCount,
-			}
-			fileIndexMap[filePath] = len(allFiles)
-			allFiles = append(allFiles, fileDeadCode)
-		}
-
-		if task != nil {
-			task.Increment(1)
-		}
+	req := domain.DeadCodeRequest{
+		Paths:       files,
+		MinSeverity: domain.DeadCodeSeverityInfo,
+		SortBy:      domain.DeadCodeSortBySeverity,
 	}
 
-	// Post-step: Detect unused exported functions (cross-file, warning severity)
-	unusedFuncFindings := analyzer.DetectUnusedExportedFunctions(allModuleInfos, analyzedFiles)
-	// Build dedup set so DetectUnusedExports won't double-report the same export
-	unusedFuncDedup := make(map[string]map[int]bool) // filePath → startLine → true
-	for _, finding := range unusedFuncFindings {
-		f := domain.DeadCodeFinding{
-			Location: domain.DeadCodeLocation{
-				FilePath:  finding.FilePath,
-				StartLine: finding.StartLine,
-				EndLine:   finding.EndLine,
-			},
-			Reason:      string(finding.Reason),
-			Severity:    domain.DeadCodeSeverity(finding.Severity),
-			Description: finding.Description,
-		}
-
-		if idx, ok := fileIndexMap[finding.FilePath]; ok {
-			allFiles[idx].FileLevelFindings = append(allFiles[idx].FileLevelFindings, f)
-			allFiles[idx].TotalFindings++
-		} else {
-			fileDeadCode := domain.FileDeadCode{
-				FilePath:          finding.FilePath,
-				FileLevelFindings: []domain.DeadCodeFinding{f},
-				TotalFindings:     1,
-			}
-			fileIndexMap[finding.FilePath] = len(allFiles)
-			allFiles = append(allFiles, fileDeadCode)
-		}
-
-		if unusedFuncDedup[finding.FilePath] == nil {
-			unusedFuncDedup[finding.FilePath] = make(map[int]bool)
-		}
-		unusedFuncDedup[finding.FilePath][finding.StartLine] = true
-
-		warningFindings++
-		totalFindings++
-	}
-
-	// Post-step: Detect unused exports (cross-file, info severity)
-	unusedExports := analyzer.DetectUnusedExports(allModuleInfos, analyzedFiles)
-	for _, finding := range unusedExports {
-		// Skip exports already reported as unused exported functions
-		if lines, ok := unusedFuncDedup[finding.FilePath]; ok && lines[finding.StartLine] {
-			continue
-		}
-
-		f := domain.DeadCodeFinding{
-			Location: domain.DeadCodeLocation{
-				FilePath:  finding.FilePath,
-				StartLine: finding.StartLine,
-				EndLine:   finding.EndLine,
-			},
-			Reason:      string(finding.Reason),
-			Severity:    domain.DeadCodeSeverity(finding.Severity),
-			Description: finding.Description,
-		}
-
-		// Merge into existing file entry or create new one
-		if idx, ok := fileIndexMap[finding.FilePath]; ok {
-			allFiles[idx].FileLevelFindings = append(allFiles[idx].FileLevelFindings, f)
-			allFiles[idx].TotalFindings++
-		} else {
-			fileDeadCode := domain.FileDeadCode{
-				FilePath:          finding.FilePath,
-				FileLevelFindings: []domain.DeadCodeFinding{f},
-				TotalFindings:     1,
-			}
-			fileIndexMap[finding.FilePath] = len(allFiles)
-			allFiles = append(allFiles, fileDeadCode)
-		}
-
-		infoFindings++
-		totalFindings++
-	}
-
-	// Post-step: Detect orphan files (cross-file)
-	orphanFindings := analyzer.DetectOrphanFiles(allModuleInfos, analyzedFiles)
-	for _, finding := range orphanFindings {
-		f := domain.DeadCodeFinding{
-			Location: domain.DeadCodeLocation{
-				FilePath: finding.FilePath,
-			},
-			Reason:      string(finding.Reason),
-			Severity:    domain.DeadCodeSeverity(finding.Severity),
-			Description: finding.Description,
-		}
-
-		if idx, ok := fileIndexMap[finding.FilePath]; ok {
-			allFiles[idx].FileLevelFindings = append(allFiles[idx].FileLevelFindings, f)
-			allFiles[idx].TotalFindings++
-		} else {
-			fileDeadCode := domain.FileDeadCode{
-				FilePath:          finding.FilePath,
-				FileLevelFindings: []domain.DeadCodeFinding{f},
-				TotalFindings:     1,
-			}
-			fileIndexMap[finding.FilePath] = len(allFiles)
-			allFiles = append(allFiles, fileDeadCode)
-		}
-
-		warningFindings++
-		totalFindings++
-	}
-
-	response := &domain.DeadCodeResponse{
-		Files: allFiles,
-		Summary: domain.DeadCodeSummary{
-			TotalFiles:            len(files),
-			TotalFunctions:        totalFunctions,
-			TotalFindings:         totalFindings,
-			FunctionsWithDeadCode: functionsWithDeadCode,
-			CriticalFindings:      criticalFindings,
-			WarningFindings:       warningFindings,
-			InfoFindings:          infoFindings,
-		},
-		GeneratedAt: time.Now().Format(time.RFC3339),
-		Version:     version.Version,
-	}
-
-	return response, nil
+	return service.AnalyzeDeadCode(context.Background(), req)
 }
 
 // collectJSFiles collects JavaScript/TypeScript files from a path using FileHelper

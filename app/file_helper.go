@@ -102,9 +102,19 @@ func (h *FileHelper) CollectJSFiles(paths []string, recursive bool, includePatte
 	return files, nil
 }
 
+// CollectPythonFiles is a compatibility wrapper for legacy domain.FileReader.
+func (h *FileHelper) CollectPythonFiles(paths []string, recursive bool, includePatterns, excludePatterns []string) ([]string, error) {
+	return h.CollectJSFiles(paths, recursive, includePatterns, excludePatterns)
+}
+
 // IsValidJSFile checks if a file is a valid JavaScript/TypeScript file
 func (h *FileHelper) IsValidJSFile(path string) bool {
 	return h.isJSFile(path)
+}
+
+// IsValidPythonFile is a compatibility wrapper for legacy domain.FileReader.
+func (h *FileHelper) IsValidPythonFile(path string) bool {
+	return h.IsValidJSFile(path)
 }
 
 // FileExists checks if a file exists
