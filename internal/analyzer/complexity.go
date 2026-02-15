@@ -94,11 +94,26 @@ func (cv *complexityVisitor) VisitBlock(block *BasicBlock) bool {
 	}
 
 	// Count logical operators and ternary expressions in statements
+	// Skip statements that are nested function nodes — their complexity
+	// is calculated in their own separate CFG.
 	for _, stmt := range block.Statements {
+		if isFunctionNode(stmt) {
+			continue
+		}
 		cv.countJavaScriptComplexity(stmt)
 	}
 
 	return true
+}
+
+// isFunctionNode returns true if the node represents a function boundary
+func isFunctionNode(n *parser.Node) bool {
+	switch n.Type {
+	case parser.NodeFunction, parser.NodeFunctionExpression, parser.NodeArrowFunction,
+		parser.NodeAsyncFunction, parser.NodeGeneratorFunction, parser.NodeMethodDefinition:
+		return true
+	}
+	return false
 }
 
 // countJavaScriptComplexity counts JavaScript-specific complexity contributors
@@ -117,9 +132,14 @@ func (cv *complexityVisitor) countJavaScriptComplexity(node *parser.Node) {
 		cv.ternaryOperators++
 	}
 
-	// Recursively check child nodes
+	// Recursively check child nodes, but stop at nested function boundaries
+	// to avoid counting inner functions' operators toward the parent's complexity
 	node.Walk(func(n *parser.Node) bool {
 		if n != node {
+			// Don't descend into nested function scopes
+			if isFunctionNode(n) {
+				return false
+			}
 			if n.Type == parser.NodeLogicalExpression {
 				cv.logicalOperators++
 			}
