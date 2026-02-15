@@ -170,7 +170,7 @@ type DeadCodeService interface {
 	// Analyze performs dead code analysis on the given request
 	Analyze(ctx context.Context, req DeadCodeRequest) (*DeadCodeResponse, error)
 
-	// AnalyzeFile analyzes a single Python file for dead code
+	// AnalyzeFile analyzes a single JavaScript/TypeScript file for dead code
 	AnalyzeFile(ctx context.Context, filePath string, req DeadCodeRequest) (*FileDeadCode, error)
 
 	// AnalyzeFunction analyzes a single function for dead code
@@ -227,8 +227,8 @@ func DefaultDeadCodeRequest() *DeadCodeRequest {
 		MinSeverity:     DeadCodeSeverityWarning,
 		SortBy:          DeadCodeSortBySeverity,
 		Recursive:       true,
-		IncludePatterns: []string{"**/*.py"},
-		ExcludePatterns: []string{"test_*.py", "*_test.py"},
+		IncludePatterns: []string{"**/*.js", "**/*.jsx", "**/*.ts", "**/*.tsx", "**/*.mjs", "**/*.cjs", "**/*.mts", "**/*.cts"},
+		ExcludePatterns: []string{"node_modules", "dist", "build", "*.min.js", "*.bundle.js", "*.map"},
 		IgnorePatterns:  []string{},
 
 		// Dead code detection options (all enabled by default)

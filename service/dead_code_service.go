@@ -5,12 +5,10 @@ import (
 	"fmt"
 	"os"
 	"sort"
-	"time"
 
 	"github.com/ludo-technologies/jscan/domain"
 	"github.com/ludo-technologies/jscan/internal/analyzer"
 	"github.com/ludo-technologies/jscan/internal/parser"
-	"github.com/ludo-technologies/jscan/internal/version"
 )
 
 // DeadCodeServiceImpl implements the DeadCodeService interface
@@ -23,52 +21,7 @@ func NewDeadCodeService() *DeadCodeServiceImpl {
 
 // Analyze performs dead code analysis on multiple files
 func (s *DeadCodeServiceImpl) Analyze(ctx context.Context, req domain.DeadCodeRequest) (*domain.DeadCodeResponse, error) {
-	var allFiles []domain.FileDeadCode
-	var warnings []string
-	var errors []string
-	filesProcessed := 0
-
-	for _, filePath := range req.Paths {
-		// Check context cancellation
-		select {
-		case <-ctx.Done():
-			return nil, fmt.Errorf("dead code analysis cancelled: %w", ctx.Err())
-		default:
-		}
-
-		// Analyze single file
-		fileResult, fileWarnings, fileErrors := s.analyzeFile(ctx, filePath, req)
-
-		if len(fileErrors) > 0 {
-			errors = append(errors, fileErrors...)
-			continue // Skip this file but continue with others
-		}
-
-		// Only include files that have dead code findings
-		if fileResult != nil && (len(fileResult.Functions) > 0 || fileResult.TotalFindings > 0) {
-			allFiles = append(allFiles, *fileResult)
-		}
-
-		warnings = append(warnings, fileWarnings...)
-		filesProcessed++
-	}
-
-	// Filter and sort results
-	filteredFiles := s.filterFiles(allFiles, req)
-	sortedFiles := s.sortFiles(filteredFiles, req.SortBy)
-
-	// Generate summary
-	summary := s.generateSummary(sortedFiles, filesProcessed, req)
-
-	return &domain.DeadCodeResponse{
-		Files:       sortedFiles,
-		Summary:     summary,
-		Warnings:    warnings,
-		Errors:      errors,
-		GeneratedAt: time.Now().Format(time.RFC3339),
-		Version:     version.Version,
-		Config:      s.buildConfigForResponse(req),
-	}, nil
+	return AnalyzeDeadCode(ctx, req)
 }
 
 // AnalyzeFile analyzes a single JavaScript/TypeScript file for dead code

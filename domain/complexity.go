@@ -142,22 +142,31 @@ type ComplexityService interface {
 	// Analyze performs complexity analysis on the given request
 	Analyze(ctx context.Context, req ComplexityRequest) (*ComplexityResponse, error)
 
-	// AnalyzeFile analyzes a single Python file
+	// AnalyzeFile analyzes a single JavaScript/TypeScript file
 	AnalyzeFile(ctx context.Context, filePath string, req ComplexityRequest) (*ComplexityResponse, error)
 }
 
-// FileReader defines the interface for reading and collecting Python files
+// FileReader defines the legacy interface for reading and collecting files.
+// NOTE: Historical Python-style method names are kept for API compatibility.
 type FileReader interface {
-	// CollectPythonFiles recursively finds all Python files in the given paths
+	// CollectPythonFiles recursively finds all JavaScript/TypeScript files in the given paths.
 	CollectPythonFiles(paths []string, recursive bool, includePatterns, excludePatterns []string) ([]string, error)
 
 	// ReadFile reads the content of a file
 	ReadFile(path string) ([]byte, error)
 
-	// IsValidPythonFile checks if a file is a valid Python file
+	// IsValidPythonFile checks if a file is a valid JavaScript/TypeScript file.
 	IsValidPythonFile(path string) bool
 
 	// FileExists checks if a file exists and returns an error if not
+	FileExists(path string) (bool, error)
+}
+
+// JSFileReader defines JavaScript/TypeScript-specific file operations.
+type JSFileReader interface {
+	CollectJSFiles(paths []string, recursive bool, includePatterns, excludePatterns []string) ([]string, error)
+	ReadFile(path string) ([]byte, error)
+	IsValidJSFile(path string) bool
 	FileExists(path string) (bool, error)
 }
 

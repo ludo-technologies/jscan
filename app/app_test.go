@@ -64,6 +64,28 @@ func TestFileHelperIsValidJSFile(t *testing.T) {
 	}
 }
 
+func TestFileHelperLegacyCompatibilityMethods(t *testing.T) {
+	tempDir := t.TempDir()
+	testFile := filepath.Join(tempDir, "test.js")
+	if err := os.WriteFile(testFile, []byte("// test"), 0644); err != nil {
+		t.Fatalf("Failed to create test file: %v", err)
+	}
+
+	helper := NewFileHelper()
+
+	files, err := helper.CollectPythonFiles([]string{tempDir}, true, nil, nil)
+	if err != nil {
+		t.Fatalf("CollectPythonFiles failed: %v", err)
+	}
+	if len(files) != 1 {
+		t.Fatalf("Expected 1 file, got %d", len(files))
+	}
+
+	if !helper.IsValidPythonFile(testFile) {
+		t.Fatal("IsValidPythonFile should return true for .js files")
+	}
+}
+
 func TestFileHelperFileExists(t *testing.T) {
 	helper := NewFileHelper()
 

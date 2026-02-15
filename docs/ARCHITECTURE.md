@@ -2,32 +2,35 @@
 
 ## Overview
 
-jscan follows **Clean Architecture** principles, separating concerns into distinct layers with clear dependency rules. Dependencies point inward: outer layers depend on inner layers, never the reverse.
+jscan uses a layered architecture inspired by **Clean Architecture**. Core analysis logic stays isolated from CLI/output concerns, while command handlers can call application use cases or services directly for pragmatic orchestration.
 
 ## Layer Diagram
 
-```
+```text
 ┌──────────────────────────────────────────────┐
-│                  CLI (cmd/)                   │
-│         cobra commands, arg parsing           │
+│                  CLI (cmd/)                  │
+│       cobra commands, arg parsing, I/O       │
 ├──────────────────────────────────────────────┤
-│              Application (app/)               │
-│         use cases, workflow orchestration      │
+│              Application (app/)              │
+│      reusable use cases / file orchestration │
 ├──────────────────────────────────────────────┤
-│               Service (service/)              │
-│     business logic, formatting, execution     │
+│               Service (service/)             │
+│   analysis orchestration, formatting, output │
 ├──────────────────────────────────────────────┤
-│              Internal (internal/)             │
-│    parser, analyzers, config, reporter        │
+│              Internal (internal/)            │
+│    parser, analyzers, config, reporter       │
 ├──────────────────────────────────────────────┤
-│               Domain (domain/)                │
-│       pure models, no external deps           │
+│               Domain (domain/)               │
+│      pure models and service interfaces       │
 └──────────────────────────────────────────────┘
 ```
 
-**Flow:** CLI (cmd) -> Application (app) -> Service (service) -> Internal (internal)
+**Typical runtime flows:**
 
-All layers depend on **domain** for shared types, but domain depends on nothing.
+- `cmd -> service -> internal -> domain`
+- `cmd -> app -> service -> internal -> domain`
+
+All layers depend on `domain` for shared types; `domain` depends on nothing.
 
 ## Layer Descriptions
 
@@ -40,13 +43,15 @@ Entry point using [cobra](https://github.com/spf13/cobra). Handles command-line 
 - `deps` - Analyze module dependencies
 - `init` - Initialize a jscan configuration file
 
+For performance-sensitive commands, CLI handlers may orchestrate services directly.
+
 ### app -- Application Use Cases
 
-Orchestrates analysis workflows by coordinating services. Use cases include:
+Provides reusable orchestration/use-case logic that can be used by CLI handlers and tests. Examples:
 
 - `analyze_usecase.go` - Full analysis pipeline
 - `complexity_usecase.go` - Complexity-focused analysis
-- `dead_code_usecase.go` - Dead code detection workflow
+- `dead_code_usecase.go` - Dead code workflow delegating to `domain.DeadCodeService`
 
 ### service -- Service Layer
 
@@ -54,6 +59,7 @@ Business logic services that operate between the CLI and core analyzers:
 
 - **complexity_service** - Orchestrates complexity analysis
 - **dead_code_service** - Orchestrates dead code detection
+- **dead_code_aggregate** - Cross-file dead code aggregation (unused imports/exports, orphan files)
 - **clone_service** - Orchestrates clone detection
 - **cbo_service** - Orchestrates coupling metrics
 - **dependency_graph_service** - Orchestrates dependency graph construction
@@ -111,9 +117,9 @@ Pure data structures with no external dependencies:
 
 ## Design Decisions
 
-### Why Clean Architecture?
+### Why layered + pragmatic orchestration?
 
-Clean Architecture keeps the core analysis logic independent of I/O concerns. The analyzer engines have no knowledge of CLI flags, output formats, or file discovery. This makes them straightforward to test in isolation and allows new output formats or CLI commands to be added without modifying analysis code.
+The layered split keeps analysis engines independent of CLI/output concerns, but still allows direct service orchestration from command handlers where it simplifies concurrency and UX behavior. This keeps critical analysis logic testable while reducing command-level duplication.
 
 ### Why tree-sitter?
 
