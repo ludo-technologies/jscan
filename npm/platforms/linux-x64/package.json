@@ -4,7 +4,6 @@
   "description": "jscan binary for Linux x64",
   "os": ["linux"],
   "cpu": ["x64"],
-  "bin": { "jscan": "./bin/jscan" },
   "files": ["bin/"],
   "license": "MIT",
   "repository": {

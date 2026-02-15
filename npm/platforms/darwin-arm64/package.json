@@ -4,7 +4,6 @@
   "description": "jscan binary for macOS ARM64",
   "os": ["darwin"],
   "cpu": ["arm64"],
-  "bin": { "jscan": "./bin/jscan" },
   "files": ["bin/"],
   "license": "MIT",
   "repository": {

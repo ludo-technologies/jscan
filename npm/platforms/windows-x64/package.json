@@ -4,7 +4,6 @@
   "description": "jscan binary for Windows x64",
   "os": ["win32"],
   "cpu": ["x64"],
-  "bin": { "jscan": "./bin/jscan.exe" },
   "files": ["bin/"],
   "license": "MIT",
   "repository": {

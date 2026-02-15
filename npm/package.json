@@ -22,6 +22,10 @@
   },
   "license": "MIT",
   "author": "Ludo Technologies",
+  "files": [
+    "bin/",
+    "package.json"
+  ],
   "bin": {
     "jscan": "./bin/jscan"
   },
