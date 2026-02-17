@@ -127,6 +127,10 @@ type AnalyzeSummary struct {
 	MediumCouplingClasses int     `json:"medium_coupling_classes" yaml:"medium_coupling_classes"` // 3 < CBO ≤ 7 (Medium Risk)
 	AverageCoupling       float64 `json:"average_coupling" yaml:"average_coupling"`
 
+	// Project scale
+	TotalLOC     int    `json:"total_loc" yaml:"total_loc"`
+	ProjectScale string `json:"project_scale" yaml:"project_scale"`
+
 	// Overall health score (0-100)
 	HealthScore int    `json:"health_score" yaml:"health_score"`
 	Grade       string `json:"grade" yaml:"grade"` // A, B, C, D, F
@@ -440,6 +444,7 @@ func (s *AnalyzeSummary) CalculateHealthScore() error {
 		score = MinimumScore
 	}
 	s.HealthScore = score
+	s.ProjectScale = s.classifyScale()
 
 	// Grade mapping
 	switch {
@@ -498,6 +503,22 @@ func GetGradeFromScore(score int) string {
 		return "D"
 	default:
 		return "F"
+	}
+}
+
+// classifyScale returns a project scale label based on the number of analyzed files
+func (s *AnalyzeSummary) classifyScale() string {
+	switch {
+	case s.AnalyzedFiles >= 1000:
+		return "Enterprise"
+	case s.AnalyzedFiles >= 200:
+		return "Large"
+	case s.AnalyzedFiles >= 50:
+		return "Medium"
+	case s.AnalyzedFiles >= 10:
+		return "Small"
+	default:
+		return "Micro"
 	}
 }
 

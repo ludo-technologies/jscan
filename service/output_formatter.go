@@ -226,6 +226,7 @@ func BuildAnalyzeSummary(
 			summary.ClonePairs = cloneResponse.Statistics.TotalClonePairs
 			summary.CloneGroups = cloneResponse.Statistics.TotalCloneGroups
 			summary.CodeDuplication = calculateDuplicationPercentage(cloneResponse)
+			summary.TotalLOC = cloneResponse.Statistics.LinesAnalyzed
 		}
 	}
 
@@ -262,6 +263,13 @@ func FormatCLISummary(summary *domain.AnalyzeSummary, duration time.Duration) st
 	w := &strings.Builder{}
 
 	fmt.Fprintf(w, "\n\U0001F4CA Analysis Summary:\n")
+	if summary.TotalLOC > 0 {
+		fmt.Fprintf(w, "Project Scale: %s (%d files, %d functions, %d LOC)\n",
+			summary.ProjectScale, summary.AnalyzedFiles, summary.TotalFunctions, summary.TotalLOC)
+	} else {
+		fmt.Fprintf(w, "Project Scale: %s (%d files, %d functions)\n",
+			summary.ProjectScale, summary.AnalyzedFiles, summary.TotalFunctions)
+	}
 	fmt.Fprintf(w, "Health Score: %d/100 (Grade: %s)\n", summary.HealthScore, summary.Grade)
 	fmt.Fprintf(w, "Total time: %dms\n", duration.Milliseconds())
 

@@ -84,6 +84,39 @@ func TestCalculateHealthScore_CyclePenaltyLogFloor(t *testing.T) {
 	}
 }
 
+func TestClassifyScale(t *testing.T) {
+	tests := []struct {
+		name          string
+		analyzedFiles int
+		wantScale     string
+	}{
+		{"zero files", 0, "Micro"},
+		{"9 files (upper Micro)", 9, "Micro"},
+		{"10 files (lower Small)", 10, "Small"},
+		{"49 files (upper Small)", 49, "Small"},
+		{"50 files (lower Medium)", 50, "Medium"},
+		{"199 files (upper Medium)", 199, "Medium"},
+		{"200 files (lower Large)", 200, "Large"},
+		{"999 files (upper Large)", 999, "Large"},
+		{"1000 files (Enterprise)", 1000, "Enterprise"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := &AnalyzeSummary{
+				AnalyzedFiles: tt.analyzedFiles,
+			}
+			if err := s.CalculateHealthScore(); err != nil {
+				t.Fatalf("CalculateHealthScore() error: %v", err)
+			}
+			if s.ProjectScale != tt.wantScale {
+				t.Errorf("ProjectScale = %q, want %q for %d files",
+					s.ProjectScale, tt.wantScale, tt.analyzedFiles)
+			}
+		})
+	}
+}
+
 func TestCalculateHealthScore_MSDPenalty(t *testing.T) {
 	tests := []struct {
 		name    string
