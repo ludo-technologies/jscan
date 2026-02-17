@@ -320,6 +320,7 @@ const htmlTemplate = `<!DOCTYPE html>
             <div class="score-badge {{gradeClass .Summary.Grade}}">
                 Health Score: {{.Summary.HealthScore}}/100 (Grade: {{.Summary.Grade}})
             </div>
+            <p class="subtitle">Project Scale: {{.Summary.ProjectScale}} ({{.Summary.AnalyzedFiles}} files, {{.Summary.TotalFunctions}} functions{{if gt .Summary.TotalLOC 0}}, {{.Summary.TotalLOC}} LOC{{end}})</p>
         </div>
 
         <div class="tabs">
