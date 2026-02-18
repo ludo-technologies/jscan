@@ -549,10 +549,10 @@ func isFrameworkReservedExport(filePath string, exp *domain.Export, exportedName
 	}
 
 	nextReserved := map[string]bool{
-		"generateMetadata": true,
-		"metadata":         true,
-		"generateViewport": true,
-		"viewport":         true,
+		"generateMetadata":     true,
+		"metadata":             true,
+		"generateViewport":     true,
+		"viewport":             true,
 		"generateStaticParams": true,
 		"dynamic":              true,
 		"dynamicParams":        true,
