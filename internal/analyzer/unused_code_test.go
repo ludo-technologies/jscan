@@ -1,6 +1,8 @@
 package analyzer
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/ludo-technologies/jscan/domain"
@@ -20,6 +22,26 @@ func parseAndAnalyze(t *testing.T, source string) (*parser.Node, *domain.ModuleI
 
 	ma := NewModuleAnalyzer(DefaultModuleAnalyzerConfig())
 	info, err := ma.AnalyzeFile(ast, "test.js")
+	if err != nil {
+		t.Fatalf("Failed to analyze module: %v", err)
+	}
+
+	return ast, info
+}
+
+// helper to parse TS source and get module info + AST
+func parseAndAnalyzeTS(t *testing.T, source string) (*parser.Node, *domain.ModuleInfo) {
+	t.Helper()
+	p := parser.NewTypeScriptParser()
+	defer p.Close()
+
+	ast, err := p.ParseFile("test.ts", []byte(source))
+	if err != nil {
+		t.Fatalf("Failed to parse TS: %v", err)
+	}
+
+	ma := NewModuleAnalyzer(DefaultModuleAnalyzerConfig())
+	info, err := ma.AnalyzeFile(ast, "test.ts")
 	if err != nil {
 		t.Fatalf("Failed to analyze module: %v", err)
 	}
@@ -139,6 +161,51 @@ func TestDetectUnusedImports_TypeOnlySkipped(t *testing.T) {
 		for _, f := range findings {
 			t.Logf("  finding: %s", f.Description)
 		}
+	}
+}
+
+func TestDetectUnusedImports_TypeReferenceCountsAsUsage(t *testing.T) {
+	source := `
+import { Metadata } from "next";
+
+type PageMeta = Metadata;
+`
+	ast, info := parseAndAnalyzeTS(t, source)
+	findings := DetectUnusedImports(ast, info, "test.ts")
+
+	if len(findings) != 0 {
+		t.Fatalf("Expected 0 findings when import is used in type position, got %d", len(findings))
+	}
+}
+
+func TestDetectUnusedImports_ImportTypeLineSkipped(t *testing.T) {
+	tmpDir := t.TempDir()
+	filePath := filepath.Join(tmpDir, "sample.ts")
+	source := `import type { ScanResult } from "@/types/scan";
+export async function getScanResult(id: string): Promise<ScanResult> {
+	return {} as ScanResult;
+}`
+	if err := os.WriteFile(filePath, []byte(source), 0o600); err != nil {
+		t.Fatalf("Failed to write temp file: %v", err)
+	}
+
+	p := parser.NewTypeScriptParser()
+	defer p.Close()
+
+	ast, err := p.ParseFile(filePath, []byte(source))
+	if err != nil {
+		t.Fatalf("Failed to parse TS: %v", err)
+	}
+
+	ma := NewModuleAnalyzer(DefaultModuleAnalyzerConfig())
+	info, err := ma.AnalyzeFile(ast, filePath)
+	if err != nil {
+		t.Fatalf("Failed to analyze module: %v", err)
+	}
+
+	findings := DetectUnusedImports(ast, info, filePath)
+	if len(findings) != 0 {
+		t.Fatalf("Expected 0 findings for `import type` line, got %d", len(findings))
 	}
 }
 
@@ -1062,5 +1129,133 @@ func TestDetectUnusedExports_NamespaceImportCoversAll(t *testing.T) {
 
 	if len(findings) != 0 {
 		t.Errorf("Expected 0 findings when namespace import covers all exports, got %d", len(findings))
+	}
+}
+
+func TestDetectUnusedExports_AliasImportResolvesTarget(t *testing.T) {
+	allInfos := map[string]*domain.ModuleInfo{
+		"/repo/src/utils/math.ts": {
+			FilePath: "/repo/src/utils/math.ts",
+			Exports: []*domain.Export{
+				{
+					ExportType: "declaration",
+					Name:       "sum",
+					Location:   domain.SourceLocation{StartLine: 1, EndLine: 1},
+				},
+			},
+		},
+		"/repo/src/app.ts": {
+			FilePath: "/repo/src/app.ts",
+			Imports: []*domain.Import{
+				{
+					Source:     "@/utils/math",
+					SourceType: domain.ModuleTypeAlias,
+					ImportType: domain.ImportTypeNamed,
+					Specifiers: []domain.ImportSpecifier{
+						{Imported: "sum", Local: "sum"},
+					},
+				},
+			},
+		},
+	}
+	analyzedFiles := map[string]bool{
+		"/repo/src/utils/math.ts": true,
+		"/repo/src/app.ts":        true,
+	}
+
+	findings := DetectUnusedExports(allInfos, analyzedFiles)
+	if len(findings) != 0 {
+		t.Errorf("Expected 0 findings when export is imported through alias, got %d", len(findings))
+	}
+}
+
+func TestDetectUnusedExportedFunctions_AliasImportResolvesTarget(t *testing.T) {
+	allInfos := map[string]*domain.ModuleInfo{
+		"/repo/src/service/user.ts": {
+			FilePath: "/repo/src/service/user.ts",
+			Exports: []*domain.Export{
+				{
+					ExportType:  "declaration",
+					Declaration: "FunctionDeclaration",
+					Name:        "loadUser",
+					Location:    domain.SourceLocation{StartLine: 1, EndLine: 3},
+				},
+			},
+		},
+		"/repo/src/app.ts": {
+			FilePath: "/repo/src/app.ts",
+			Imports: []*domain.Import{
+				{
+					Source:     "@/service/user",
+					SourceType: domain.ModuleTypeAlias,
+					ImportType: domain.ImportTypeNamed,
+					Specifiers: []domain.ImportSpecifier{
+						{Imported: "loadUser", Local: "loadUser"},
+					},
+				},
+			},
+		},
+	}
+	analyzedFiles := map[string]bool{
+		"/repo/src/service/user.ts": true,
+		"/repo/src/app.ts":          true,
+	}
+
+	findings := DetectUnusedExportedFunctions(allInfos, analyzedFiles)
+	if len(findings) != 0 {
+		t.Errorf("Expected 0 findings when exported function is imported through alias, got %d", len(findings))
+	}
+}
+
+func TestDetectUnusedExportedFunctions_NextPageReservedExportsSkipped(t *testing.T) {
+	allInfos := map[string]*domain.ModuleInfo{
+		"/repo/src/app/scan/[id]/page.tsx": {
+			FilePath: "/repo/src/app/scan/[id]/page.tsx",
+			Exports: []*domain.Export{
+				{
+					ExportType:  "declaration",
+					Declaration: "AsyncFunctionDeclaration",
+					Name:        "generateMetadata",
+					Location:    domain.SourceLocation{StartLine: 8, EndLine: 43},
+				},
+				{
+					ExportType:  "default",
+					Declaration: "AsyncFunctionDeclaration",
+					Name:        "ScanPage",
+					Location:    domain.SourceLocation{StartLine: 45, EndLine: 59},
+				},
+			},
+		},
+	}
+	analyzedFiles := map[string]bool{
+		"/repo/src/app/scan/[id]/page.tsx": true,
+	}
+
+	findings := DetectUnusedExportedFunctions(allInfos, analyzedFiles)
+	if len(findings) != 0 {
+		t.Fatalf("Expected 0 findings for Next.js reserved page exports, got %d", len(findings))
+	}
+}
+
+func TestDetectUnusedExports_NextPageDefaultExportSkipped(t *testing.T) {
+	allInfos := map[string]*domain.ModuleInfo{
+		"/repo/src/app/page.tsx": {
+			FilePath: "/repo/src/app/page.tsx",
+			Exports: []*domain.Export{
+				{
+					ExportType: "default",
+					Name:       "Home",
+					Location:   domain.SourceLocation{StartLine: 3, EndLine: 34},
+				},
+			},
+		},
+	}
+	analyzedFiles := map[string]bool{
+		"/repo/src/app/page.tsx": true,
+	}
+
+	findings := DetectUnusedExports(allInfos, analyzedFiles)
+	if len(findings) != 0 {
+		t.Fatalf("Expected 0 findings for Next.js page default export, got %d", len(findings))
 	}
 }
