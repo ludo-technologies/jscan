@@ -118,7 +118,7 @@ func (b *ASTBuilder) buildNode(tsNode *sitter.Node) *Node {
 		return b.buildAwaitExpression(tsNode)
 	case "yield_expression":
 		return b.buildYieldExpression(tsNode)
-	case "identifier", "property_identifier", "shorthand_property_identifier":
+	case "identifier", "property_identifier", "shorthand_property_identifier", "type_identifier":
 		return b.buildIdentifier(tsNode)
 	case "string", "number", "true", "false", "null":
 		return b.buildLiteral(tsNode)

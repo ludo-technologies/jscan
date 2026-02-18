@@ -1,7 +1,9 @@
 package analyzer
 
 import (
+	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"github.com/ludo-technologies/jscan/domain"
@@ -17,6 +19,7 @@ func DetectUnusedImports(ast *parser.Node, moduleInfo *domain.ModuleInfo, filePa
 	}
 
 	// Collect local names from imports (skip side-effect, type-only, dynamic)
+	typeOnlyImportLines := detectTypeOnlyImportLines(filePath)
 	type importEntry struct {
 		localName string
 		line      int
@@ -30,7 +33,7 @@ func DetectUnusedImports(ast *parser.Node, moduleInfo *domain.ModuleInfo, filePa
 			continue
 		}
 		// Skip type-only imports (import type { Foo } from 'bar')
-		if imp.IsTypeOnly || imp.ImportType == domain.ImportTypeTypeOnly {
+		if imp.IsTypeOnly || imp.ImportType == domain.ImportTypeTypeOnly || typeOnlyImportLines[imp.Location.StartLine] {
 			continue
 		}
 		// Skip dynamic imports (import('foo'))
@@ -105,6 +108,27 @@ func DetectUnusedImports(ast *parser.Node, moduleInfo *domain.ModuleInfo, filePa
 	return findings
 }
 
+// detectTypeOnlyImportLines returns source line numbers where import declarations are
+// explicitly type-only (e.g. `import type { Foo } from 'bar'`).
+func detectTypeOnlyImportLines(filePath string) map[int]bool {
+	lines := make(map[int]bool)
+	if filePath == "" {
+		return lines
+	}
+
+	content, err := os.ReadFile(filePath)
+	if err != nil {
+		return lines
+	}
+
+	for i, line := range strings.Split(string(content), "\n") {
+		if strings.HasPrefix(strings.TrimSpace(line), "import type ") {
+			lines[i+1] = true
+		}
+	}
+	return lines
+}
+
 // DetectUnusedExports detects exported names that are not imported by any other analyzed file.
 // It builds a reverse index of all imports across files and checks each export against it.
 func DetectUnusedExports(allModuleInfos map[string]*domain.ModuleInfo, analyzedFiles map[string]bool) []*DeadCodeFinding {
@@ -118,35 +142,29 @@ func DetectUnusedExports(allModuleInfos map[string]*domain.ModuleInfo, analyzedF
 
 	for importingFile, info := range allModuleInfos {
 		for _, imp := range info.Imports {
-			if imp.SourceType != domain.ModuleTypeRelative {
-				continue
-			}
-
-			resolvedPath := resolveImportPath(importingFile, imp.Source, analyzedFiles)
-			if resolvedPath == "" {
-				continue
-			}
-
-			if importedNamesFromFile[resolvedPath] == nil {
-				importedNamesFromFile[resolvedPath] = make(map[string]bool)
-			}
-
-			// Track which names are imported
-			switch imp.ImportType {
-			case domain.ImportTypeNamespace:
-				// import * as X — marks the whole module as "used"
-				importedNamesFromFile[resolvedPath]["*"] = true
-			case domain.ImportTypeDefault, domain.ImportTypeNamed:
-				for _, spec := range imp.Specifiers {
-					name := spec.Imported
-					if name == "" {
-						name = spec.Local
-					}
-					importedNamesFromFile[resolvedPath][name] = true
+			resolvedPaths := resolveImportPaths(importingFile, imp.Source, imp.SourceType, analyzedFiles)
+			for _, resolvedPath := range resolvedPaths {
+				if importedNamesFromFile[resolvedPath] == nil {
+					importedNamesFromFile[resolvedPath] = make(map[string]bool)
 				}
-			case domain.ImportTypeSideEffect:
-				// Side-effect import means the file is "used"
-				importedNamesFromFile[resolvedPath]["*"] = true
+
+				// Track which names are imported
+				switch imp.ImportType {
+				case domain.ImportTypeNamespace:
+					// import * as X — marks the whole module as "used"
+					importedNamesFromFile[resolvedPath]["*"] = true
+				case domain.ImportTypeDefault, domain.ImportTypeNamed:
+					for _, spec := range imp.Specifiers {
+						name := spec.Imported
+						if name == "" {
+							name = spec.Local
+						}
+						importedNamesFromFile[resolvedPath][name] = true
+					}
+				case domain.ImportTypeSideEffect:
+					// Side-effect import means the file is "used"
+					importedNamesFromFile[resolvedPath]["*"] = true
+				}
 			}
 		}
 	}
@@ -188,6 +206,9 @@ func DetectUnusedExports(allModuleInfos map[string]*domain.ModuleInfo, analyzedF
 			exportedNames := getExportedNames(exp)
 
 			for _, name := range exportedNames {
+				if isFrameworkReservedExport(filePath, exp, name) {
+					continue
+				}
 				if importedNames == nil || !importedNames[name] {
 					findings = append(findings, &DeadCodeFinding{
 						FilePath:    filePath,
@@ -344,17 +365,13 @@ func DetectOrphanFiles(allModuleInfos map[string]*domain.ModuleInfo, analyzedFil
 
 	for importingFile, info := range allModuleInfos {
 		for _, imp := range info.Imports {
-			if imp.SourceType != domain.ModuleTypeRelative {
-				continue
+			resolvedPaths := resolveImportPaths(importingFile, imp.Source, imp.SourceType, analyzedFiles)
+			for _, resolvedPath := range resolvedPaths {
+				if reverseEdges[resolvedPath] == nil {
+					reverseEdges[resolvedPath] = make(map[string]bool)
+				}
+				reverseEdges[resolvedPath][importingFile] = true
 			}
-			resolvedPath := resolveImportPath(importingFile, imp.Source, analyzedFiles)
-			if resolvedPath == "" {
-				continue
-			}
-			if reverseEdges[resolvedPath] == nil {
-				reverseEdges[resolvedPath] = make(map[string]bool)
-			}
-			reverseEdges[resolvedPath][importingFile] = true
 		}
 	}
 
@@ -393,16 +410,12 @@ func DetectOrphanFiles(allModuleInfos map[string]*domain.ModuleInfo, analyzedFil
 		}
 
 		for _, imp := range info.Imports {
-			if imp.SourceType != domain.ModuleTypeRelative {
-				continue
-			}
-			resolvedPath := resolveImportPath(current, imp.Source, analyzedFiles)
-			if resolvedPath == "" {
-				continue
-			}
-			if !reachable[resolvedPath] {
-				reachable[resolvedPath] = true
-				queue = append(queue, resolvedPath)
+			resolvedPaths := resolveImportPaths(current, imp.Source, imp.SourceType, analyzedFiles)
+			for _, resolvedPath := range resolvedPaths {
+				if !reachable[resolvedPath] {
+					reachable[resolvedPath] = true
+					queue = append(queue, resolvedPath)
+				}
 			}
 		}
 	}
@@ -440,32 +453,26 @@ func DetectUnusedExportedFunctions(allModuleInfos map[string]*domain.ModuleInfo,
 
 	for importingFile, info := range allModuleInfos {
 		for _, imp := range info.Imports {
-			if imp.SourceType != domain.ModuleTypeRelative {
-				continue
-			}
-
-			resolvedPath := resolveImportPath(importingFile, imp.Source, analyzedFiles)
-			if resolvedPath == "" {
-				continue
-			}
-
-			if importedNamesFromFile[resolvedPath] == nil {
-				importedNamesFromFile[resolvedPath] = make(map[string]bool)
-			}
-
-			switch imp.ImportType {
-			case domain.ImportTypeNamespace:
-				importedNamesFromFile[resolvedPath]["*"] = true
-			case domain.ImportTypeDefault, domain.ImportTypeNamed:
-				for _, spec := range imp.Specifiers {
-					name := spec.Imported
-					if name == "" {
-						name = spec.Local
-					}
-					importedNamesFromFile[resolvedPath][name] = true
+			resolvedPaths := resolveImportPaths(importingFile, imp.Source, imp.SourceType, analyzedFiles)
+			for _, resolvedPath := range resolvedPaths {
+				if importedNamesFromFile[resolvedPath] == nil {
+					importedNamesFromFile[resolvedPath] = make(map[string]bool)
 				}
-			case domain.ImportTypeSideEffect:
-				importedNamesFromFile[resolvedPath]["*"] = true
+
+				switch imp.ImportType {
+				case domain.ImportTypeNamespace:
+					importedNamesFromFile[resolvedPath]["*"] = true
+				case domain.ImportTypeDefault, domain.ImportTypeNamed:
+					for _, spec := range imp.Specifiers {
+						name := spec.Imported
+						if name == "" {
+							name = spec.Local
+						}
+						importedNamesFromFile[resolvedPath][name] = true
+					}
+				case domain.ImportTypeSideEffect:
+					importedNamesFromFile[resolvedPath]["*"] = true
+				}
 			}
 		}
 	}
@@ -511,6 +518,9 @@ func DetectUnusedExportedFunctions(allModuleInfos map[string]*domain.ModuleInfo,
 			exportedNames := getExportedNames(exp)
 
 			for _, name := range exportedNames {
+				if isFrameworkReservedExport(filePath, exp, name) {
+					continue
+				}
 				if importedNames == nil || !importedNames[name] {
 					findings = append(findings, &DeadCodeFinding{
 						FilePath:    filePath,
@@ -526,4 +536,137 @@ func DetectUnusedExportedFunctions(allModuleInfos map[string]*domain.ModuleInfo,
 	}
 
 	return findings
+}
+
+func isFrameworkReservedExport(filePath string, exp *domain.Export, exportedName string) bool {
+	if !isNextAppRouterConventionFile(filePath) {
+		return false
+	}
+
+	// Next.js App Router convention files expose exports consumed by the framework.
+	if exportedName == "default" {
+		return true
+	}
+
+	nextReserved := map[string]bool{
+		"generateMetadata":     true,
+		"metadata":             true,
+		"generateViewport":     true,
+		"viewport":             true,
+		"generateStaticParams": true,
+		"dynamic":              true,
+		"dynamicParams":        true,
+		"revalidate":           true,
+		"fetchCache":           true,
+		"runtime":              true,
+		"preferredRegion":      true,
+		"maxDuration":          true,
+	}
+	if nextReserved[exportedName] {
+		return true
+	}
+
+	// Route handlers in app/**/route.ts are framework entry points.
+	if isNextRouteHandlerFile(filePath) {
+		switch exportedName {
+		case "GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS":
+			return true
+		}
+	}
+
+	_ = exp
+	return false
+}
+
+func isNextAppRouterConventionFile(filePath string) bool {
+	path := filepath.ToSlash(filePath)
+	if !strings.Contains(path, "/app/") {
+		return false
+	}
+
+	base := filepath.Base(path)
+	nameWithoutExt := strings.TrimSuffix(base, filepath.Ext(base))
+	switch nameWithoutExt {
+	case "page", "layout", "template", "loading", "error", "not-found", "default", "route":
+		return true
+	default:
+		return false
+	}
+}
+
+func isNextRouteHandlerFile(filePath string) bool {
+	path := filepath.ToSlash(filePath)
+	base := filepath.Base(path)
+	nameWithoutExt := strings.TrimSuffix(base, filepath.Ext(base))
+	return strings.Contains(path, "/app/") && nameWithoutExt == "route"
+}
+
+// resolveImportPaths resolves an import source to zero or more known file paths.
+// Relative imports resolve to a single concrete path. Alias imports may resolve to
+// multiple candidates when the alias root is ambiguous.
+func resolveImportPaths(importingFile, source string, sourceType domain.ModuleType, knownFiles map[string]bool) []string {
+	switch sourceType {
+	case domain.ModuleTypeRelative:
+		resolved := resolveImportPath(importingFile, source, knownFiles)
+		if resolved == "" {
+			return nil
+		}
+		return []string{resolved}
+	case domain.ModuleTypeAlias:
+		return resolveAliasImportPaths(source, knownFiles)
+	default:
+		return nil
+	}
+}
+
+// resolveAliasImportPaths resolves aliased import paths (e.g. "@/utils") by matching
+// suffix candidates against known analyzed files.
+func resolveAliasImportPaths(source string, knownFiles map[string]bool) []string {
+	candidateBases := make(map[string]bool)
+	candidateBases[source] = true
+
+	if idx := strings.Index(source, "/"); idx >= 0 && idx+1 < len(source) {
+		candidateBases[source[idx+1:]] = true
+	}
+	if strings.HasPrefix(source, "@/") || strings.HasPrefix(source, "~/") {
+		candidateBases[source[2:]] = true
+	}
+
+	extensions := []string{".ts", ".tsx", ".js", ".jsx", ".mts", ".cts", ".mjs", ".cjs"}
+	matches := make(map[string]bool)
+
+	for base := range candidateBases {
+		base = strings.TrimSpace(base)
+		base = strings.TrimPrefix(base, "/")
+		if base == "" {
+			continue
+		}
+
+		candidates := []string{base}
+		for _, ext := range extensions {
+			candidates = append(candidates, base+ext)
+			candidates = append(candidates, filepath.Join(base, "index"+ext))
+		}
+
+		for file := range knownFiles {
+			normalized := filepath.ToSlash(file)
+			for _, c := range candidates {
+				c = filepath.ToSlash(c)
+				if normalized == c || strings.HasSuffix(normalized, "/"+c) {
+					matches[file] = true
+				}
+			}
+		}
+	}
+
+	if len(matches) == 0 {
+		return nil
+	}
+
+	result := make([]string, 0, len(matches))
+	for file := range matches {
+		result = append(result, file)
+	}
+	sort.Strings(result)
+	return result
 }

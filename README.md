@@ -36,7 +36,7 @@ https://github.com/user-attachments/assets/6c491b52-99d3-4fa4-b628-e09c0b61451d
 - **CBO / Instability** – Graph-based dependency metrics (Ca, Ce, Instability, Main Sequence distance)
 - **Health score** – Weighted multi-factor scoring based on violation ratios
 
-**Parallel execution** • **Multiple output formats (HTML, JSON, CSV, DOT)** • Built with Go + tree-sitter
+**Parallel execution** • **Multiple output formats (Analyze: HTML/JSON/Text, Deps: Text/JSON/DOT)** • Built with Go + tree-sitter
 
 ## Installation
 
@@ -75,7 +75,7 @@ jscan analyze src/                              # All analyses with HTML report
 jscan analyze --format json src/                # Generate JSON report
 jscan analyze --select complexity src/          # Only complexity analysis
 jscan analyze --select deadcode src/            # Only dead code analysis
-jscan analyze --select complexity,deadcode,clones src/  # Multiple analyses
+jscan analyze --select complexity,deadcode,clone src/  # Multiple analyses
 ```
 
 ### `jscan check`
@@ -126,7 +126,7 @@ Create a `jscan.config.json` or `.jscanrc.json` in your project root:
 }
 ```
 
-> ⚙️ Run `jscan init` to generate a configuration file with all available options
+> ⚙️ Run `jscan init` to generate a configuration file with core options
 
 ## Roadmap
 
