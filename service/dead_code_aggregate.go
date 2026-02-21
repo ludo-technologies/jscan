@@ -263,7 +263,8 @@ func AnalyzeDeadCodeWithTask(ctx context.Context, req domain.DeadCodeRequest, ta
 		incrementTask()
 	}
 
-	unusedFuncFindings := analyzer.DetectUnusedExportedFunctions(allModuleInfos, analyzedFiles)
+	graph := analyzer.BuildImportGraph(allModuleInfos, analyzedFiles)
+	unusedFuncFindings := analyzer.DetectUnusedExportedFunctions(allModuleInfos, graph)
 	for _, finding := range unusedFuncFindings {
 		select {
 		case <-ctx.Done():
@@ -291,7 +292,7 @@ func AnalyzeDeadCodeWithTask(ctx context.Context, req domain.DeadCodeRequest, ta
 		}
 	}
 
-	unusedExports := analyzer.DetectUnusedExports(allModuleInfos, analyzedFiles)
+	unusedExports := analyzer.DetectUnusedExports(allModuleInfos, graph)
 	for _, finding := range unusedExports {
 		select {
 		case <-ctx.Done():
@@ -316,7 +317,7 @@ func AnalyzeDeadCodeWithTask(ctx context.Context, req domain.DeadCodeRequest, ta
 		addFileLevelFinding(f)
 	}
 
-	orphanFindings := analyzer.DetectOrphanFiles(allModuleInfos, analyzedFiles)
+	orphanFindings := analyzer.DetectOrphanFiles(allModuleInfos, graph)
 	for _, finding := range orphanFindings {
 		select {
 		case <-ctx.Done():

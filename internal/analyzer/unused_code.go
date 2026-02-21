@@ -10,6 +10,97 @@ import (
 	"github.com/ludo-technologies/jscan/internal/parser"
 )
 
+// suffixIndex provides O(1) alias import path resolution by pre-indexing
+// all known files by their path suffixes up to maxSuffixDepth components.
+type suffixIndex struct {
+	bySuffix map[string][]string // normalized suffix → list of matching absolute file paths
+}
+
+const maxSuffixDepth = 5
+
+// buildSuffixIndex constructs the suffix index from the set of known files.
+// For a file "/repo/src/utils/math.ts" it inserts entries for:
+// "math.ts", "utils/math.ts", "src/utils/math.ts", "repo/src/utils/math.ts"
+// (up to maxSuffixDepth components).
+func buildSuffixIndex(knownFiles map[string]bool) *suffixIndex {
+	idx := &suffixIndex{bySuffix: make(map[string][]string, len(knownFiles))}
+	for file := range knownFiles {
+		normalized := filepath.ToSlash(file)
+		parts := strings.Split(normalized, "/")
+		start := len(parts) - maxSuffixDepth
+		if start < 0 {
+			start = 0
+		}
+		for i := start; i < len(parts); i++ {
+			suffix := strings.Join(parts[i:], "/")
+			if suffix == "" {
+				continue
+			}
+			idx.bySuffix[suffix] = append(idx.bySuffix[suffix], file)
+		}
+	}
+	return idx
+}
+
+// ImportGraph is the precomputed cross-file import relationship graph.
+// Build it once with BuildImportGraph and pass it to the Detect* functions.
+type ImportGraph struct {
+	// importedNamesFromFile maps resolved file path → set of imported names from that file.
+	// A "*" entry means the file is namespace-imported or side-effect imported.
+	importedNamesFromFile map[string]map[string]bool
+	// reverseEdges maps resolved file path → set of file paths that import it.
+	reverseEdges map[string]map[string]bool
+	// forwardEdges maps importing file path → list of resolved file paths it imports.
+	forwardEdges map[string][]string
+}
+
+// BuildImportGraph constructs the ImportGraph in a single pass over allModuleInfos.
+// It builds the suffix index once and reuses it for all alias resolutions.
+// Returns a non-nil graph even for empty inputs.
+func BuildImportGraph(allModuleInfos map[string]*domain.ModuleInfo, analyzedFiles map[string]bool) *ImportGraph {
+	graph := &ImportGraph{
+		importedNamesFromFile: make(map[string]map[string]bool),
+		reverseEdges:          make(map[string]map[string]bool),
+		forwardEdges:          make(map[string][]string),
+	}
+	if len(allModuleInfos) == 0 {
+		return graph
+	}
+	idx := buildSuffixIndex(analyzedFiles)
+	for importingFile, info := range allModuleInfos {
+		for _, imp := range info.Imports {
+			resolvedPaths := resolveImportPaths(importingFile, imp.Source, imp.SourceType, analyzedFiles, idx)
+			for _, resolvedPath := range resolvedPaths {
+				if graph.importedNamesFromFile[resolvedPath] == nil {
+					graph.importedNamesFromFile[resolvedPath] = make(map[string]bool)
+				}
+				switch imp.ImportType {
+				case domain.ImportTypeNamespace:
+					graph.importedNamesFromFile[resolvedPath]["*"] = true
+				case domain.ImportTypeDefault, domain.ImportTypeNamed:
+					for _, spec := range imp.Specifiers {
+						name := spec.Imported
+						if name == "" {
+							name = spec.Local
+						}
+						graph.importedNamesFromFile[resolvedPath][name] = true
+					}
+				case domain.ImportTypeSideEffect:
+					graph.importedNamesFromFile[resolvedPath]["*"] = true
+				}
+				if graph.reverseEdges[resolvedPath] == nil {
+					graph.reverseEdges[resolvedPath] = make(map[string]bool)
+				}
+				graph.reverseEdges[resolvedPath][importingFile] = true
+			}
+			if len(resolvedPaths) > 0 {
+				graph.forwardEdges[importingFile] = append(graph.forwardEdges[importingFile], resolvedPaths...)
+			}
+		}
+	}
+	return graph
+}
+
 // DetectUnusedImports detects imported names that are never referenced in the file.
 // It walks the AST to collect all identifier references (excluding import/export declarations)
 // and compares them against the locally-bound import names.
@@ -130,44 +221,13 @@ func detectTypeOnlyImportLines(filePath string) map[int]bool {
 }
 
 // DetectUnusedExports detects exported names that are not imported by any other analyzed file.
-// It builds a reverse index of all imports across files and checks each export against it.
-func DetectUnusedExports(allModuleInfos map[string]*domain.ModuleInfo, analyzedFiles map[string]bool) []*DeadCodeFinding {
+// It uses the precomputed ImportGraph to check each export against the reverse import index.
+func DetectUnusedExports(allModuleInfos map[string]*domain.ModuleInfo, graph *ImportGraph) []*DeadCodeFinding {
 	if len(allModuleInfos) == 0 {
 		return nil
 	}
 
-	// Build reverse index: resolved source path → set of imported names
-	// This tells us which names are imported from each file
-	importedNamesFromFile := make(map[string]map[string]bool)
-
-	for importingFile, info := range allModuleInfos {
-		for _, imp := range info.Imports {
-			resolvedPaths := resolveImportPaths(importingFile, imp.Source, imp.SourceType, analyzedFiles)
-			for _, resolvedPath := range resolvedPaths {
-				if importedNamesFromFile[resolvedPath] == nil {
-					importedNamesFromFile[resolvedPath] = make(map[string]bool)
-				}
-
-				// Track which names are imported
-				switch imp.ImportType {
-				case domain.ImportTypeNamespace:
-					// import * as X — marks the whole module as "used"
-					importedNamesFromFile[resolvedPath]["*"] = true
-				case domain.ImportTypeDefault, domain.ImportTypeNamed:
-					for _, spec := range imp.Specifiers {
-						name := spec.Imported
-						if name == "" {
-							name = spec.Local
-						}
-						importedNamesFromFile[resolvedPath][name] = true
-					}
-				case domain.ImportTypeSideEffect:
-					// Side-effect import means the file is "used"
-					importedNamesFromFile[resolvedPath]["*"] = true
-				}
-			}
-		}
-	}
+	importedNamesFromFile := graph.importedNamesFromFile
 
 	var findings []*DeadCodeFinding
 
@@ -354,26 +414,12 @@ func isConfigFile(filePath string) bool {
 // DetectOrphanFiles detects files that are not reachable from any entry point via import chains.
 // Entry points are: index/main/app/server files, and files not imported by any other file.
 // Test files and config files are skipped.
-func DetectOrphanFiles(allModuleInfos map[string]*domain.ModuleInfo, analyzedFiles map[string]bool) []*DeadCodeFinding {
+func DetectOrphanFiles(allModuleInfos map[string]*domain.ModuleInfo, graph *ImportGraph) []*DeadCodeFinding {
 	if len(allModuleInfos) == 0 {
 		return nil
 	}
 
-	// Build forward edges: file → set of files it imports
-	// Build reverse edges: file → set of files that import it
-	reverseEdges := make(map[string]map[string]bool)
-
-	for importingFile, info := range allModuleInfos {
-		for _, imp := range info.Imports {
-			resolvedPaths := resolveImportPaths(importingFile, imp.Source, imp.SourceType, analyzedFiles)
-			for _, resolvedPath := range resolvedPaths {
-				if reverseEdges[resolvedPath] == nil {
-					reverseEdges[resolvedPath] = make(map[string]bool)
-				}
-				reverseEdges[resolvedPath][importingFile] = true
-			}
-		}
-	}
+	reverseEdges := graph.reverseEdges
 
 	// Determine entry points:
 	// 1. Files matching isEntryPointFile (index, main, app, server)
@@ -392,7 +438,7 @@ func DetectOrphanFiles(allModuleInfos map[string]*domain.ModuleInfo, analyzedFil
 		}
 	}
 
-	// BFS from entry points to find all reachable files
+	// BFS from entry points using precomputed forward edges
 	reachable := make(map[string]bool)
 	queue := make([]string, 0, len(entryPoints))
 	for ep := range entryPoints {
@@ -404,18 +450,10 @@ func DetectOrphanFiles(allModuleInfos map[string]*domain.ModuleInfo, analyzedFil
 		current := queue[0]
 		queue = queue[1:]
 
-		info, ok := allModuleInfos[current]
-		if !ok {
-			continue
-		}
-
-		for _, imp := range info.Imports {
-			resolvedPaths := resolveImportPaths(current, imp.Source, imp.SourceType, analyzedFiles)
-			for _, resolvedPath := range resolvedPaths {
-				if !reachable[resolvedPath] {
-					reachable[resolvedPath] = true
-					queue = append(queue, resolvedPath)
-				}
+		for _, resolvedPath := range graph.forwardEdges[current] {
+			if !reachable[resolvedPath] {
+				reachable[resolvedPath] = true
+				queue = append(queue, resolvedPath)
 			}
 		}
 	}
@@ -443,39 +481,12 @@ func DetectOrphanFiles(allModuleInfos map[string]*domain.ModuleInfo, analyzedFil
 // DetectUnusedExportedFunctions detects exported functions and classes that are not imported
 // by any other file in the project. Unlike DetectUnusedExports which covers all exports at
 // info severity, this targets only function/class declarations at warning severity.
-func DetectUnusedExportedFunctions(allModuleInfos map[string]*domain.ModuleInfo, analyzedFiles map[string]bool) []*DeadCodeFinding {
+func DetectUnusedExportedFunctions(allModuleInfos map[string]*domain.ModuleInfo, graph *ImportGraph) []*DeadCodeFinding {
 	if len(allModuleInfos) == 0 {
 		return nil
 	}
 
-	// Build reverse index: resolved source path → set of imported names
-	importedNamesFromFile := make(map[string]map[string]bool)
-
-	for importingFile, info := range allModuleInfos {
-		for _, imp := range info.Imports {
-			resolvedPaths := resolveImportPaths(importingFile, imp.Source, imp.SourceType, analyzedFiles)
-			for _, resolvedPath := range resolvedPaths {
-				if importedNamesFromFile[resolvedPath] == nil {
-					importedNamesFromFile[resolvedPath] = make(map[string]bool)
-				}
-
-				switch imp.ImportType {
-				case domain.ImportTypeNamespace:
-					importedNamesFromFile[resolvedPath]["*"] = true
-				case domain.ImportTypeDefault, domain.ImportTypeNamed:
-					for _, spec := range imp.Specifiers {
-						name := spec.Imported
-						if name == "" {
-							name = spec.Local
-						}
-						importedNamesFromFile[resolvedPath][name] = true
-					}
-				case domain.ImportTypeSideEffect:
-					importedNamesFromFile[resolvedPath]["*"] = true
-				}
-			}
-		}
-	}
+	importedNamesFromFile := graph.importedNamesFromFile
 
 	var findings []*DeadCodeFinding
 
@@ -604,7 +615,7 @@ func isNextRouteHandlerFile(filePath string) bool {
 // resolveImportPaths resolves an import source to zero or more known file paths.
 // Relative imports resolve to a single concrete path. Alias imports may resolve to
 // multiple candidates when the alias root is ambiguous.
-func resolveImportPaths(importingFile, source string, sourceType domain.ModuleType, knownFiles map[string]bool) []string {
+func resolveImportPaths(importingFile, source string, sourceType domain.ModuleType, knownFiles map[string]bool, idx *suffixIndex) []string {
 	switch sourceType {
 	case domain.ModuleTypeRelative:
 		resolved := resolveImportPath(importingFile, source, knownFiles)
@@ -613,20 +624,20 @@ func resolveImportPaths(importingFile, source string, sourceType domain.ModuleTy
 		}
 		return []string{resolved}
 	case domain.ModuleTypeAlias:
-		return resolveAliasImportPaths(source, knownFiles)
+		return resolveAliasImportPaths(source, idx)
 	default:
 		return nil
 	}
 }
 
-// resolveAliasImportPaths resolves aliased import paths (e.g. "@/utils") by matching
-// suffix candidates against known analyzed files.
-func resolveAliasImportPaths(source string, knownFiles map[string]bool) []string {
+// resolveAliasImportPaths resolves aliased import paths (e.g. "@/utils") by looking up
+// suffix candidates in the precomputed suffix index for O(1) lookup per candidate.
+func resolveAliasImportPaths(source string, idx *suffixIndex) []string {
 	candidateBases := make(map[string]bool)
 	candidateBases[source] = true
 
-	if idx := strings.Index(source, "/"); idx >= 0 && idx+1 < len(source) {
-		candidateBases[source[idx+1:]] = true
+	if slashIdx := strings.Index(source, "/"); slashIdx >= 0 && slashIdx+1 < len(source) {
+		candidateBases[source[slashIdx+1:]] = true
 	}
 	if strings.HasPrefix(source, "@/") || strings.HasPrefix(source, "~/") {
 		candidateBases[source[2:]] = true
@@ -645,15 +656,14 @@ func resolveAliasImportPaths(source string, knownFiles map[string]bool) []string
 		candidates := []string{base}
 		for _, ext := range extensions {
 			candidates = append(candidates, base+ext)
-			candidates = append(candidates, filepath.Join(base, "index"+ext))
+			candidates = append(candidates, filepath.ToSlash(filepath.Join(base, "index"+ext)))
 		}
 
-		for file := range knownFiles {
-			normalized := filepath.ToSlash(file)
-			for _, c := range candidates {
-				c = filepath.ToSlash(c)
-				if normalized == c || strings.HasSuffix(normalized, "/"+c) {
-					matches[file] = true
+		for _, c := range candidates {
+			c = filepath.ToSlash(c)
+			if files, ok := idx.bySuffix[c]; ok {
+				for _, f := range files {
+					matches[f] = true
 				}
 			}
 		}

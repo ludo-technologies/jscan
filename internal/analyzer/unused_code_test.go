@@ -262,7 +262,8 @@ func TestDetectUnusedExports_AllImported(t *testing.T) {
 		"/src/app.js":   true,
 	}
 
-	findings := DetectUnusedExports(allInfos, analyzedFiles)
+	graph := BuildImportGraph(allInfos, analyzedFiles)
+	findings := DetectUnusedExports(allInfos, graph)
 
 	if len(findings) != 0 {
 		t.Errorf("Expected 0 findings when export is imported, got %d", len(findings))
@@ -294,7 +295,8 @@ func TestDetectUnusedExports_NeverImported(t *testing.T) {
 		"/src/app.js":   true,
 	}
 
-	findings := DetectUnusedExports(allInfos, analyzedFiles)
+	graph := BuildImportGraph(allInfos, analyzedFiles)
+	findings := DetectUnusedExports(allInfos, graph)
 
 	if len(findings) != 1 {
 		t.Fatalf("Expected 1 finding for unused export, got %d", len(findings))
@@ -329,7 +331,8 @@ func TestDetectUnusedExports_ReExportSkipped(t *testing.T) {
 		"/src/utils.js": true,
 	}
 
-	findings := DetectUnusedExports(allInfos, analyzedFiles)
+	graph := BuildImportGraph(allInfos, analyzedFiles)
+	findings := DetectUnusedExports(allInfos, graph)
 
 	if len(findings) != 0 {
 		t.Errorf("Expected 0 findings for re-export, got %d", len(findings))
@@ -353,7 +356,8 @@ func TestDetectUnusedExports_IndexFileSkipped(t *testing.T) {
 		"/src/index.js": true,
 	}
 
-	findings := DetectUnusedExports(allInfos, analyzedFiles)
+	graph := BuildImportGraph(allInfos, analyzedFiles)
+	findings := DetectUnusedExports(allInfos, graph)
 
 	if len(findings) != 0 {
 		t.Errorf("Expected 0 findings for index file exports, got %d", len(findings))
@@ -377,7 +381,8 @@ func TestDetectUnusedExports_TestFileSkipped(t *testing.T) {
 		"/src/utils.test.js": true,
 	}
 
-	findings := DetectUnusedExports(allInfos, analyzedFiles)
+	graph := BuildImportGraph(allInfos, analyzedFiles)
+	findings := DetectUnusedExports(allInfos, graph)
 
 	if len(findings) != 0 {
 		t.Errorf("Expected 0 findings for test file exports, got %d", len(findings))
@@ -401,7 +406,8 @@ func TestDetectUnusedExports_SpecFileSkipped(t *testing.T) {
 		"/src/utils.spec.ts": true,
 	}
 
-	findings := DetectUnusedExports(allInfos, analyzedFiles)
+	graph := BuildImportGraph(allInfos, analyzedFiles)
+	findings := DetectUnusedExports(allInfos, graph)
 
 	if len(findings) != 0 {
 		t.Errorf("Expected 0 findings for spec file exports, got %d", len(findings))
@@ -409,7 +415,8 @@ func TestDetectUnusedExports_SpecFileSkipped(t *testing.T) {
 }
 
 func TestDetectUnusedExports_NilInput(t *testing.T) {
-	findings := DetectUnusedExports(nil, nil)
+	graph := BuildImportGraph(nil, nil)
+	findings := DetectUnusedExports(nil, graph)
 	if findings != nil {
 		t.Errorf("Expected nil findings for nil input, got %d", len(findings))
 	}
@@ -562,7 +569,8 @@ func TestDetectUnusedExports_DefaultExport(t *testing.T) {
 		"/src/app.js":       true,
 	}
 
-	findings := DetectUnusedExports(allInfos, analyzedFiles)
+	graph := BuildImportGraph(allInfos, analyzedFiles)
+	findings := DetectUnusedExports(allInfos, graph)
 
 	if len(findings) != 0 {
 		t.Errorf("Expected 0 findings when default export is imported, got %d", len(findings))
@@ -696,7 +704,8 @@ func TestDetectOrphanFiles_BasicOrphan(t *testing.T) {
 		"/src/orphan-dep.js": true,
 	}
 
-	findings := DetectOrphanFiles(allInfos, analyzedFiles)
+	graph := BuildImportGraph(allInfos, analyzedFiles)
+	findings := DetectOrphanFiles(allInfos, graph)
 
 	// app.js is a root (entry point by name), utils.js and lib.js are reachable from app.
 	// orphan.js is also a root (no one imports it), orphan-dep.js is reachable from orphan.
@@ -727,7 +736,8 @@ func TestDetectOrphanFiles_EntryPointNotOrphan(t *testing.T) {
 		"/src/server.ts": true,
 	}
 
-	findings := DetectOrphanFiles(allInfos, analyzedFiles)
+	graph := BuildImportGraph(allInfos, analyzedFiles)
+	findings := DetectOrphanFiles(allInfos, graph)
 
 	if len(findings) != 0 {
 		t.Errorf("Expected 0 findings for entry point files, got %d", len(findings))
@@ -751,7 +761,8 @@ func TestDetectOrphanFiles_TestFileSkipped(t *testing.T) {
 		"/src/utils.test.js": true,
 	}
 
-	findings := DetectOrphanFiles(allInfos, analyzedFiles)
+	graph := BuildImportGraph(allInfos, analyzedFiles)
+	findings := DetectOrphanFiles(allInfos, graph)
 
 	if len(findings) != 0 {
 		t.Errorf("Expected 0 findings when only test files are unreachable, got %d", len(findings))
@@ -776,7 +787,8 @@ func TestDetectOrphanFiles_ConfigFileSkipped(t *testing.T) {
 		"/vitest.setup.ts": true,
 	}
 
-	findings := DetectOrphanFiles(allInfos, analyzedFiles)
+	graph := BuildImportGraph(allInfos, analyzedFiles)
+	findings := DetectOrphanFiles(allInfos, graph)
 
 	if len(findings) != 0 {
 		t.Errorf("Expected 0 findings for config/setup files, got %d", len(findings))
@@ -824,7 +836,8 @@ func TestDetectOrphanFiles_AllConnected(t *testing.T) {
 		"/src/utils.js": true,
 	}
 
-	findings := DetectOrphanFiles(allInfos, analyzedFiles)
+	graph := BuildImportGraph(allInfos, analyzedFiles)
+	findings := DetectOrphanFiles(allInfos, graph)
 
 	if len(findings) != 0 {
 		t.Errorf("Expected 0 findings when all files are connected, got %d", len(findings))
@@ -832,7 +845,8 @@ func TestDetectOrphanFiles_AllConnected(t *testing.T) {
 }
 
 func TestDetectOrphanFiles_NilInput(t *testing.T) {
-	findings := DetectOrphanFiles(nil, nil)
+	graph := BuildImportGraph(nil, nil)
+	findings := DetectOrphanFiles(nil, graph)
 	if findings != nil {
 		t.Errorf("Expected nil findings for nil input, got %d", len(findings))
 	}
@@ -863,7 +877,8 @@ func TestDetectUnusedExportedFunctions_UnusedFunction(t *testing.T) {
 		"/src/app.js":   true,
 	}
 
-	findings := DetectUnusedExportedFunctions(allInfos, analyzedFiles)
+	graph := BuildImportGraph(allInfos, analyzedFiles)
+	findings := DetectUnusedExportedFunctions(allInfos, graph)
 
 	if len(findings) != 1 {
 		t.Fatalf("Expected 1 finding for unused exported function, got %d", len(findings))
@@ -908,7 +923,8 @@ func TestDetectUnusedExportedFunctions_UsedFunction(t *testing.T) {
 		"/src/app.js":   true,
 	}
 
-	findings := DetectUnusedExportedFunctions(allInfos, analyzedFiles)
+	graph := BuildImportGraph(allInfos, analyzedFiles)
+	findings := DetectUnusedExportedFunctions(allInfos, graph)
 
 	if len(findings) != 0 {
 		t.Errorf("Expected 0 findings when exported function is imported, got %d", len(findings))
@@ -938,7 +954,8 @@ func TestDetectUnusedExportedFunctions_ConstNotTargeted(t *testing.T) {
 		"/src/app.js":   true,
 	}
 
-	findings := DetectUnusedExportedFunctions(allInfos, analyzedFiles)
+	graph := BuildImportGraph(allInfos, analyzedFiles)
+	findings := DetectUnusedExportedFunctions(allInfos, graph)
 
 	if len(findings) != 0 {
 		t.Errorf("Expected 0 findings for const export (not function/class), got %d", len(findings))
@@ -963,7 +980,8 @@ func TestDetectUnusedExportedFunctions_EntryPointSkipped(t *testing.T) {
 		"/src/index.js": true,
 	}
 
-	findings := DetectUnusedExportedFunctions(allInfos, analyzedFiles)
+	graph := BuildImportGraph(allInfos, analyzedFiles)
+	findings := DetectUnusedExportedFunctions(allInfos, graph)
 
 	if len(findings) != 0 {
 		t.Errorf("Expected 0 findings for entry point file exports, got %d", len(findings))
@@ -988,7 +1006,8 @@ func TestDetectUnusedExportedFunctions_TestFileSkipped(t *testing.T) {
 		"/src/utils.test.js": true,
 	}
 
-	findings := DetectUnusedExportedFunctions(allInfos, analyzedFiles)
+	graph := BuildImportGraph(allInfos, analyzedFiles)
+	findings := DetectUnusedExportedFunctions(allInfos, graph)
 
 	if len(findings) != 0 {
 		t.Errorf("Expected 0 findings for test file exports, got %d", len(findings))
@@ -1018,7 +1037,8 @@ func TestDetectUnusedExportedFunctions_DefaultExportFunction(t *testing.T) {
 		"/src/app.js":       true,
 	}
 
-	findings := DetectUnusedExportedFunctions(allInfos, analyzedFiles)
+	graph := BuildImportGraph(allInfos, analyzedFiles)
+	findings := DetectUnusedExportedFunctions(allInfos, graph)
 
 	if len(findings) != 1 {
 		t.Fatalf("Expected 1 finding for unused default export function, got %d", len(findings))
@@ -1051,7 +1071,8 @@ func TestDetectUnusedExportedFunctions_ClassExport(t *testing.T) {
 		"/src/app.js":     true,
 	}
 
-	findings := DetectUnusedExportedFunctions(allInfos, analyzedFiles)
+	graph := BuildImportGraph(allInfos, analyzedFiles)
+	findings := DetectUnusedExportedFunctions(allInfos, graph)
 
 	if len(findings) != 1 {
 		t.Fatalf("Expected 1 finding for unused exported class, got %d", len(findings))
@@ -1059,7 +1080,8 @@ func TestDetectUnusedExportedFunctions_ClassExport(t *testing.T) {
 }
 
 func TestDetectUnusedExportedFunctions_NilInput(t *testing.T) {
-	findings := DetectUnusedExportedFunctions(nil, nil)
+	graph := BuildImportGraph(nil, nil)
+	findings := DetectUnusedExportedFunctions(nil, graph)
 	if findings != nil {
 		t.Errorf("Expected nil findings for nil input, got %d", len(findings))
 	}
@@ -1125,7 +1147,8 @@ func TestDetectUnusedExports_NamespaceImportCoversAll(t *testing.T) {
 		"/src/app.js":   true,
 	}
 
-	findings := DetectUnusedExports(allInfos, analyzedFiles)
+	graph := BuildImportGraph(allInfos, analyzedFiles)
+	findings := DetectUnusedExports(allInfos, graph)
 
 	if len(findings) != 0 {
 		t.Errorf("Expected 0 findings when namespace import covers all exports, got %d", len(findings))
@@ -1163,7 +1186,8 @@ func TestDetectUnusedExports_AliasImportResolvesTarget(t *testing.T) {
 		"/repo/src/app.ts":        true,
 	}
 
-	findings := DetectUnusedExports(allInfos, analyzedFiles)
+	graph := BuildImportGraph(allInfos, analyzedFiles)
+	findings := DetectUnusedExports(allInfos, graph)
 	if len(findings) != 0 {
 		t.Errorf("Expected 0 findings when export is imported through alias, got %d", len(findings))
 	}
@@ -1201,7 +1225,8 @@ func TestDetectUnusedExportedFunctions_AliasImportResolvesTarget(t *testing.T) {
 		"/repo/src/app.ts":          true,
 	}
 
-	findings := DetectUnusedExportedFunctions(allInfos, analyzedFiles)
+	graph := BuildImportGraph(allInfos, analyzedFiles)
+	findings := DetectUnusedExportedFunctions(allInfos, graph)
 	if len(findings) != 0 {
 		t.Errorf("Expected 0 findings when exported function is imported through alias, got %d", len(findings))
 	}
@@ -1231,7 +1256,8 @@ func TestDetectUnusedExportedFunctions_NextPageReservedExportsSkipped(t *testing
 		"/repo/src/app/scan/[id]/page.tsx": true,
 	}
 
-	findings := DetectUnusedExportedFunctions(allInfos, analyzedFiles)
+	graph := BuildImportGraph(allInfos, analyzedFiles)
+	findings := DetectUnusedExportedFunctions(allInfos, graph)
 	if len(findings) != 0 {
 		t.Fatalf("Expected 0 findings for Next.js reserved page exports, got %d", len(findings))
 	}
@@ -1254,7 +1280,8 @@ func TestDetectUnusedExports_NextPageDefaultExportSkipped(t *testing.T) {
 		"/repo/src/app/page.tsx": true,
 	}
 
-	findings := DetectUnusedExports(allInfos, analyzedFiles)
+	graph := BuildImportGraph(allInfos, analyzedFiles)
+	findings := DetectUnusedExports(allInfos, graph)
 	if len(findings) != 0 {
 		t.Fatalf("Expected 0 findings for Next.js page default export, got %d", len(findings))
 	}
