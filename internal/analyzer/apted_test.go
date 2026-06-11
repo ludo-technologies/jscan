@@ -742,3 +742,26 @@ func TestConvertASTIncludesExpressionFieldsInAPTEDDistance(t *testing.T) {
 		t.Errorf("fragments differing only in expression operators should have non-zero distance, got %f", distance)
 	}
 }
+
+func TestComputeApproximateDistanceNilTrees(t *testing.T) {
+	analyzer := NewAPTEDAnalyzer(NewDefaultCostModel())
+
+	// Both nil
+	if distance := analyzer.computeApproximateDistance(nil, nil); distance != 0.0 {
+		t.Errorf("Approximate distance between two nil trees should be 0, got %f", distance)
+	}
+
+	// Create a test tree for comparison
+	tree := NewTreeNode(1, "test")
+	tree.AddChild(NewTreeNode(2, "child"))
+
+	// First nil
+	if distance := analyzer.computeApproximateDistance(nil, tree); distance != float64(tree.Size()) {
+		t.Errorf("Approximate distance from nil should equal tree size, got %f", distance)
+	}
+
+	// Second nil
+	if distance := analyzer.computeApproximateDistance(tree, nil); distance != float64(tree.Size()) {
+		t.Errorf("Approximate distance to nil should equal tree size, got %f", distance)
+	}
+}

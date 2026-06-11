@@ -832,7 +832,6 @@ func (cd *CloneDetector) compareFragments(fragment1, fragment2 *CodeFragment, pa
 	}
 }
 
-
 // fragmentToClone converts a CodeFragment to a domain.Clone.
 // The same fragment always maps to the same clone instance and ID so that
 // grouping strategies can recognize shared members across pairs.
