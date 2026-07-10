@@ -3,12 +3,8 @@ package analyzer
 import (
 	"fmt"
 	"hash/fnv"
-	"regexp"
 	"strings"
 )
-
-// Precompiled regex for whitespace normalization (avoid recompilation on each call)
-var whitespaceRegex = regexp.MustCompile(`\s+`)
 
 // TextualSimilarityAnalyzer computes textual similarity for Type-1 clone detection.
 // Type-1 clones are identical code fragments except for whitespace and comments.
@@ -184,15 +180,56 @@ func (t *TextualSimilarityAnalyzer) removeJSComments(content string) string {
 	return b.String()
 }
 
-// normalizeWhitespaceInContent normalizes whitespace in content
+// normalizeWhitespaceInContent normalizes code whitespace while preserving
+// whitespace inside string and template literals, where it changes behavior.
 func (t *TextualSimilarityAnalyzer) normalizeWhitespaceInContent(content string) string {
-	// Replace multiple whitespace characters with single space (using precompiled regex)
-	content = whitespaceRegex.ReplaceAllString(content, " ")
+	var b strings.Builder
+	b.Grow(len(content))
+	var quote byte
+	escaped := false
+	inWhitespace := false
 
-	// Trim leading and trailing whitespace
-	content = strings.TrimSpace(content)
+	for i := 0; i < len(content); i++ {
+		ch := content[i]
+		if quote != 0 {
+			b.WriteByte(ch)
+			if escaped {
+				escaped = false
+			} else if ch == '\\' {
+				escaped = true
+			} else if ch == quote {
+				quote = 0
+			}
+			continue
+		}
 
-	return content
+		if ch == '\'' || ch == '"' || ch == '`' {
+			quote = ch
+			inWhitespace = false
+			b.WriteByte(ch)
+			continue
+		}
+		if isSourceWhitespace(ch) {
+			if !inWhitespace {
+				b.WriteByte(' ')
+				inWhitespace = true
+			}
+			continue
+		}
+		inWhitespace = false
+		b.WriteByte(ch)
+	}
+
+	return strings.TrimSpace(b.String())
+}
+
+func isSourceWhitespace(ch byte) bool {
+	switch ch {
+	case ' ', '\t', '\n', '\r', '\f':
+		return true
+	default:
+		return false
+	}
 }
 
 // hashContent computes a FNV-64 hash of the content for quick equality check

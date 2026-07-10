@@ -56,8 +56,8 @@ func TestCoveredGroups_Repro(t *testing.T) {
 	if out.groups[0] != outer {
 		t.Fatalf("expected the larger-window group to survive, got %v", rangesOf(out.groups[0]))
 	}
-	if len(out.suppressed) != 2 {
-		t.Fatalf("expected both members of the covered group suppressed, got %d", len(out.suppressed))
+	if len(out.suppressedPairs) != 1 {
+		t.Fatalf("expected the covered group's pair suppressed, got %d", len(out.suppressedPairs))
 	}
 }
 
@@ -102,8 +102,8 @@ func TestCoveredGroups_PartialCoverageKeptBoth(t *testing.T) {
 	if len(out.groups) != 2 {
 		t.Fatalf("expected both groups kept, got %d", len(out.groups))
 	}
-	if len(out.suppressed) != 0 {
-		t.Fatalf("expected no suppressed clones, got %d", len(out.suppressed))
+	if len(out.suppressedPairs) != 0 {
+		t.Fatalf("expected no suppressed pairs, got %d", len(out.suppressedPairs))
 	}
 }
 
@@ -153,14 +153,13 @@ func TestCoveredGroups_StrongerInnerFindingKept(t *testing.T) {
 	if len(out.groups) != 2 {
 		t.Fatalf("expected both groups kept when inner is the stronger finding, got %d", len(out.groups))
 	}
-	if len(out.suppressed) != 0 {
-		t.Fatalf("expected no suppressed clones, got %d", len(out.suppressed))
+	if len(out.suppressedPairs) != 0 {
+		t.Fatalf("expected no suppressed pairs, got %d", len(out.suppressedPairs))
 	}
 }
 
-// TestCoveredGroups_SharedCloneKeepsPairs verifies that a clone also present
-// in a surviving group is not marked suppressed, so its clone pairs stay in
-// the output.
+// TestCoveredGroups_SharedCloneKeepsPairs verifies that a pair needed by a
+// surviving group is not suppressed.
 func TestCoveredGroups_SharedCloneKeepsPairs(t *testing.T) {
 	shared := gc("x.js", 5, 9)
 	covered := makeGroup(1, shared, gc("y.js", 5, 9))
@@ -172,11 +171,60 @@ func TestCoveredGroups_SharedCloneKeepsPairs(t *testing.T) {
 	if len(out.groups) != 2 {
 		t.Fatalf("expected covering+keeper groups to survive, got %d", len(out.groups))
 	}
-	if _, ok := out.suppressed[cloneID(shared)]; ok {
-		t.Fatalf("clone shared with a surviving group must not be suppressed")
+	if _, ok := out.suppressedPairs[clonePairKey(shared, keeper.Clones[1])]; ok {
+		t.Fatalf("pair used by a surviving group must not be suppressed")
 	}
-	if len(out.suppressed) != 1 {
-		t.Fatalf("expected only the non-shared member suppressed, got %d", len(out.suppressed))
+	if len(out.suppressedPairs) != 1 {
+		t.Fatalf("expected only the covered group's pair suppressed, got %d", len(out.suppressedPairs))
+	}
+}
+
+func TestCoveredGroups_SameLinesDifferentColumnsKept(t *testing.T) {
+	leftX := gc("x.js", 1, 1)
+	leftX.Location.StartCol, leftX.Location.EndCol = 1, 10
+	leftY := gc("y.js", 1, 1)
+	leftY.Location.StartCol, leftY.Location.EndCol = 1, 10
+	rightX := gc("x.js", 1, 1)
+	rightX.Location.StartCol, rightX.Location.EndCol = 20, 30
+	rightY := gc("y.js", 1, 1)
+	rightY.Location.StartCol, rightY.Location.EndCol = 20, 30
+
+	out := dedupeCoveredGroups([]*domain.CloneGroup{
+		makeGroup(1, leftX, leftY),
+		makeGroup(2, rightX, rightY),
+	})
+
+	if len(out.groups) != 2 {
+		t.Fatalf("expected groups at different columns to remain distinct, got %d", len(out.groups))
+	}
+}
+
+func TestFilterMaximalPerFile_SameLinesDifferentColumnsKept(t *testing.T) {
+	left := gc("x.js", 1, 1)
+	left.Location.StartCol, left.Location.EndCol = 1, 10
+	right := gc("x.js", 1, 1)
+	right.Location.StartCol, right.Location.EndCol = 20, 30
+
+	kept, suppressed := filterMaximalPerFile([]*domain.Clone{left, right})
+	if len(kept) != 2 || len(suppressed) != 0 {
+		t.Fatalf("expected fragments at different columns to remain distinct, got %d kept", len(kept))
+	}
+}
+
+func TestFilterSuppressedClonePairs_KeepsUnrelatedPair(t *testing.T) {
+	a := gc("x.js", 10, 20)
+	b := gc("y.js", 10, 20)
+	c := gc("z.js", 10, 20)
+	coveredPair := &domain.ClonePair{Clone1: a, Clone2: b}
+	unrelatedPair := &domain.ClonePair{Clone1: a, Clone2: c}
+
+	out := filterSuppressedClonePairs(
+		[]*domain.ClonePair{coveredPair, unrelatedPair},
+		map[string]struct{}{clonePairKey(a, b): {}},
+	)
+
+	if len(out) != 1 || out[0] != unrelatedPair {
+		t.Fatalf("expected unrelated pair sharing one member to survive, got %+v", out)
 	}
 }
 

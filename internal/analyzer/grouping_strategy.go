@@ -1348,8 +1348,9 @@ func orderClusterIDs(firstID, secondID int) (int, int) {
 }
 
 type groupDedupeResult struct {
-	groups     []*domain.CloneGroup
-	suppressed map[string]struct{} // keyed by cloneID location key
+	groups          []*domain.CloneGroup
+	suppressed      map[string]struct{} // keyed by cloneID location key
+	suppressedPairs map[string]struct{} // keyed by clonePairKey
 }
 
 // dedupeStrictSubsetGroupMembers removes clone-group members whose source
@@ -1438,8 +1439,9 @@ const coveredGroupSimilarityTolerance = 0.05
 // other (identical member ranges), the earlier one in the slice wins.
 func dedupeCoveredGroups(groups []*domain.CloneGroup) groupDedupeResult {
 	result := groupDedupeResult{
-		groups:     groups,
-		suppressed: make(map[string]struct{}),
+		groups:          groups,
+		suppressed:      make(map[string]struct{}),
+		suppressedPairs: make(map[string]struct{}),
 	}
 	if len(groups) < 2 {
 		return result
@@ -1473,29 +1475,29 @@ func dedupeCoveredGroups(groups []*domain.CloneGroup) groupDedupeResult {
 	}
 
 	out := make([]*domain.CloneGroup, 0, len(groups))
-	keptClones := make(map[string]struct{})
+	keptPairs := make(map[string]struct{})
 	for i, g := range groups {
 		if g == nil || suppressed[i] {
 			continue
 		}
 		out = append(out, g)
-		for _, c := range g.Clones {
-			keptClones[cloneID(c)] = struct{}{}
+		for first := 0; first < len(g.Clones); first++ {
+			for second := first + 1; second < len(g.Clones); second++ {
+				keptPairs[clonePairKey(g.Clones[first], g.Clones[second])] = struct{}{}
+			}
 		}
 	}
 	for i, g := range groups {
 		if g == nil || !suppressed[i] {
 			continue
 		}
-		for _, c := range g.Clones {
-			if c == nil {
-				continue
+		for first := 0; first < len(g.Clones); first++ {
+			for second := first + 1; second < len(g.Clones); second++ {
+				key := clonePairKey(g.Clones[first], g.Clones[second])
+				if _, needed := keptPairs[key]; !needed {
+					result.suppressedPairs[key] = struct{}{}
+				}
 			}
-			// A clone shared with a surviving group keeps its pairs.
-			if _, ok := keptClones[cloneID(c)]; ok {
-				continue
-			}
-			result.suppressed[cloneID(c)] = struct{}{}
 		}
 	}
 	result.groups = out
@@ -1557,11 +1559,16 @@ func groupCoveredBy(inner, outer *domain.CloneGroup) bool {
 }
 
 // locationCovers reports whether outer contains inner (same file, inclusive
-// line ranges; equal ranges count as covered).
+// line and column ranges; equal ranges count as covered).
 func locationCovers(outer, inner *domain.CloneLocation) bool {
-	return outer.FilePath == inner.FilePath &&
-		outer.StartLine <= inner.StartLine &&
-		outer.EndLine >= inner.EndLine
+	if outer.FilePath != inner.FilePath {
+		return false
+	}
+	startsBefore := outer.StartLine < inner.StartLine ||
+		(outer.StartLine == inner.StartLine && outer.StartCol <= inner.StartCol)
+	endsAfter := outer.EndLine > inner.EndLine ||
+		(outer.EndLine == inner.EndLine && outer.EndCol >= inner.EndCol)
+	return startsBefore && endsAfter
 }
 
 // filterCloneGroupsWithoutBackingPairs drops groups whose refreshed metadata
@@ -1629,13 +1636,11 @@ func filterMaximalPerFile(clones []*domain.Clone) ([]*domain.Clone, map[string]s
 // iInner) in the same file. Strict coverage suppresses inner outright;
 // identical ranges suppress only the later index so that exactly one survives.
 func covers(outer, inner *domain.CloneLocation, iOuter, iInner int) bool {
-	if outer.FilePath != inner.FilePath {
+	if !locationCovers(outer, inner) {
 		return false
 	}
-	if outer.StartLine > inner.StartLine || outer.EndLine < inner.EndLine {
-		return false
-	}
-	if outer.StartLine == inner.StartLine && outer.EndLine == inner.EndLine {
+	if outer.StartLine == inner.StartLine && outer.StartCol == inner.StartCol &&
+		outer.EndLine == inner.EndLine && outer.EndCol == inner.EndCol {
 		return iOuter < iInner
 	}
 	return true
@@ -1670,6 +1675,23 @@ func filterClonePairsWithSuppressedMembers(pairs []*domain.ClonePair, suppressed
 			continue
 		}
 		if _, ok := suppressed[cloneID(pair.Clone2)]; ok {
+			continue
+		}
+		out = append(out, pair)
+	}
+	return out
+}
+
+func filterSuppressedClonePairs(pairs []*domain.ClonePair, suppressed map[string]struct{}) []*domain.ClonePair {
+	if len(pairs) == 0 || len(suppressed) == 0 {
+		return pairs
+	}
+	out := make([]*domain.ClonePair, 0, len(pairs))
+	for _, pair := range pairs {
+		if pair == nil {
+			continue
+		}
+		if _, ok := suppressed[clonePairKey(pair.Clone1, pair.Clone2)]; ok {
 			continue
 		}
 		out = append(out, pair)

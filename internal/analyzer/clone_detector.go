@@ -964,6 +964,7 @@ func (cd *CloneDetector) groupClonesWithStrategy(strategy GroupingStrategy) {
 		groupResult.suppressed[key] = struct{}{}
 	}
 	cd.clonePairs = filterClonePairsWithSuppressedMembers(cd.clonePairs, groupResult.suppressed)
+	cd.clonePairs = filterSuppressedClonePairs(cd.clonePairs, groupResult.suppressedPairs)
 }
 
 // isSameLocation checks if two locations refer to the same code

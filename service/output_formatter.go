@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"math"
 	"sort"
 	"strconv"
 	"strings"
@@ -409,7 +408,7 @@ func calculateDuplicationPercentage(response *domain.CloneResponse) float64 {
 		return 0.0
 	}
 
-	return math.Min(domain.DuplicationThresholdHigh, float64(totalClones)/float64(totalFragments)*100)
+	return float64(totalClones) / float64(totalFragments) * 100
 }
 
 // writeComplexityText writes complexity response as plain text

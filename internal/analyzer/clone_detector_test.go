@@ -143,6 +143,20 @@ func TestCodeFragment_Hash(t *testing.T) {
 			t.Error("expected different hashes for different code")
 		}
 	})
+
+	t.Run("literal whitespace produces different hashes", func(t *testing.T) {
+		withTwoSpaces := newFragment("function f() { return \"a  b\"; }")
+		withOneSpace := newFragment("function f() { return \"a b\"; }")
+		if withTwoSpaces.Hash == withOneSpace.Hash {
+			t.Error("whitespace inside a string literal must affect the hash")
+		}
+
+		multilineTemplate := newFragment("function f() { return `a\n b`; }")
+		singleLineTemplate := newFragment("function f() { return `a b`; }")
+		if multilineTemplate.Hash == singleLineTemplate.Hash {
+			t.Error("whitespace inside a template literal must affect the hash")
+		}
+	})
 }
 
 func TestCodeLocationString(t *testing.T) {
