@@ -29,14 +29,17 @@ https://github.com/user-attachments/assets/6c491b52-99d3-4fa4-b628-e09c0b61451d
 
 ## Features
 
-- **Dead code detection** – CFG + DFS reachability analysis for unreachable code, unused imports/exports, and orphan files
-- **Clone detection** – APTED tree edit distance with MinHash/LSH pre-filtering (Type 1–4)
-- **Circular dependency detection** – Tarjan's Strongly Connected Components (O(V+E))
-- **Cyclomatic complexity** – McCabe complexity including logical operators and ternaries
-- **CBO / Instability** – Graph-based dependency metrics (Ca, Ce, Instability, Main Sequence distance)
-- **Health score** – Weighted multi-factor scoring based on violation ratios
+One command scores your whole codebase (0-100 with an A-F grade) and generates an HTML report that shows what to fix first.
 
-**Parallel execution** • **Multiple output formats (Analyze: HTML/JSON/Text, Deps: Text/JSON/DOT)** • Built with Go + tree-sitter
+jscan looks at your code from five angles:
+
+- 🧹 **Dead code** - unreachable code, unused imports/exports, and orphan files you can safely delete
+- 📋 **Duplicate code** - copy-pasted and structurally similar code worth merging (Type 1-4 clone detection)
+- 🌀 **Complexity** - functions that are hard to read and test (cyclomatic complexity)
+- 🏗️ **Dependencies** - circular imports and unstable module dependencies (Martin metrics, DOT graph export)
+- 🧩 **Class design** - classes that depend on too much (CBO coupling)
+
+**Parallel execution** • Built with Go + tree-sitter
 
 ## AI Agent Integration
 
@@ -54,11 +57,11 @@ Then just ask your agent:
 
 1. "Analyze the code quality of the src/ directory"
 
-2. "Fix the most complex function in this codebase"
+2. "Find duplicate code and help me refactor it"
 
-3. "Find and remove dead code"
+3. "Show me complex code and help me simplify it"
 
-### Claude Code Plugin
+### Claude Code Plugin (Optional)
 
 ```bash
 claude plugin marketplace add ludo-technologies/jscan
