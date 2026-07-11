@@ -1,4 +1,7 @@
 {
   "name": "jscan",
-  "description": "JavaScript/TypeScript code quality analysis skills"
+  "description": "JavaScript/TypeScript code quality analysis skills",
+  "author": {
+    "name": "Ludo Technologies"
+  }
 }

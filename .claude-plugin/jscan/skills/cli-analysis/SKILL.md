@@ -7,7 +7,7 @@ description: Run the jscan command-line tool for JavaScript/TypeScript code qual
 
 Use the `jscan` command-line tool when the task needs report files, CI integration, or project configuration.
 
-No install needed: `npx jscan@latest <command>` (or `npm install -g jscan` for a permanent install).
+No install needed: `npx jscan@latest <command>` (or `npm install -g jscan` for a permanent install). The examples below use a bare `jscan` for readability — prefix with `npx jscan@latest` when jscan isn't installed.
 
 ## Commands
 
@@ -55,7 +55,7 @@ Exit codes: `0` no issues, `1` quality issues found, `2` analysis failed (invali
 
 ## Configuration
 
-Settings load in priority order: command-line flags > `jscan.config.json` / `.jscanrc.json` > defaults. Run `jscan init` to scaffold `jscan.config.json` when a project wants persistent thresholds.
+Run `jscan init` to scaffold `jscan.config.json` (`.jscanrc.json` also works) when a project wants persistent settings. The config file supplies complexity thresholds, exclude patterns, and the default for `check --max-complexity`; command-line flags always win over config values. Output format and `--select` are flag-only — the config file does not change them.
 
 ## Reporting Results
 
