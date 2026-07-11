@@ -38,6 +38,35 @@ https://github.com/user-attachments/assets/6c491b52-99d3-4fa4-b628-e09c0b61451d
 
 **Parallel execution** • **Multiple output formats (Analyze: HTML/JSON/Text, Deps: Text/JSON/DOT)** • Built with Go + tree-sitter
 
+## AI Agent Integration
+
+jscan ships Agent Skills that teach AI coding agents when and how to run each analysis: health checks, refactoring, architecture review, and CI-friendly reports.
+
+### Agent Skills (Recommended)
+
+```bash
+uvx add-skills ludo-technologies/jscan
+```
+
+This installs the Skills into your project. They work with Claude Code, Cursor, Codex, Gemini CLI, and [many other agents](https://github.com/ludo-technologies/add-skills) (add `--agent cursor` etc. to target one, `--global` for all projects).
+
+Then just ask your agent:
+
+1. "Analyze the code quality of the src/ directory"
+
+2. "Fix the most complex function in this codebase"
+
+3. "Find and remove dead code"
+
+### Claude Code Plugin
+
+```bash
+claude plugin marketplace add ludo-technologies/jscan
+claude plugin install jscan@jscan-marketplace
+```
+
+The plugin installs the same Agent Skills through Claude Code's plugin system.
+
 ## Installation
 
 ```bash
