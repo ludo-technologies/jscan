@@ -1,3 +1,10 @@
+> [!IMPORTANT]
+> **jscan has moved to the [polyscan monorepo](https://github.com/ludo-technologies/polyscan)** and now lives in [`polyscan/jscan`](https://github.com/ludo-technologies/polyscan/tree/main/jscan). This repository is preserved for history and no longer receives updates.
+>
+> - Releases up to **v0.9.0** (npm [`jscan`](https://www.npmjs.com/package/jscan), `go install github.com/ludo-technologies/jscan/cmd/jscan@v0.9.0`) remain available here; newer releases ship from polyscan under the same npm package name.
+> - Agent Skills / Claude Code plugin now install from the monorepo: `uvx add-skills ludo-technologies/polyscan` / `claude plugin marketplace add ludo-technologies/polyscan`
+> - Please report issues in the [polyscan issue tracker](https://github.com/ludo-technologies/polyscan/issues).
+
 <div align="center">
 
 # jscan
